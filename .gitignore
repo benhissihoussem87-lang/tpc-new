@@ -1,0 +1,14 @@
+vendor/
+node_modules/
+*.log
+*.tmp
+*.zip
+*.rar
+*.7z
+*.bak
+*.orig
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+release/
