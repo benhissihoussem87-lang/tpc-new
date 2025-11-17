@@ -66,6 +66,11 @@ class Factures {
         try {
             $this->cnx->beginTransaction();
 
+            // Remove payment records before dropping the facture itself so
+            // orphaned entries don't linger in the `reglement` table.
+            $stReg = $this->cnx->prepare("DELETE FROM reglement WHERE num_fact = :num");
+            $stReg->execute([':num' => $num]);
+
             // Remove Bon de Commande tied to this facture number
             // (Many pages use bon_commande.num_bon_commande == facture.num_fact)
             $stBc = $this->cnx->prepare("DELETE FROM bon_commande WHERE num_bon_commande = :num");

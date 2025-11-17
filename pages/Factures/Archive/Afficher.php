@@ -80,6 +80,34 @@ if (isset($_GET['deleteFacture'])) {
 }
 
 $factures = $facture->AfficherFacturesArchives();
+$selectedYear = '';
+if (!empty($_GET['year']) && preg_match('/^\d{4}$/', $_GET['year'])) {
+    $selectedYear = $_GET['year'];
+}
+$archiveYears = [];
+if (!empty($factures)) {
+    foreach ($factures as $row) {
+        $year = isset($row['date']) ? substr((string)$row['date'], 0, 4) : '';
+        if (preg_match('/^\d{4}$/', $year)) {
+            $archiveYears[$year] = true;
+        }
+    }
+}
+$archiveYears = array_keys($archiveYears);
+rsort($archiveYears, SORT_STRING);
+if ($selectedYear !== '') {
+    $factures = array_values(array_filter($factures, function ($row) use ($selectedYear) {
+        $date = isset($row['date']) ? (string)$row['date'] : '';
+        $num  = isset($row['num_fact']) ? (string)$row['num_fact'] : '';
+        if (strpos($date, $selectedYear) === 0) {
+            return true;
+        }
+        if (strpos($num, '/'.$selectedYear) !== false || strpos($num, $selectedYear.'/') === 0) {
+            return true;
+        }
+        return false;
+    }));
+}
 
 ?>
 <!-- UI -->
@@ -91,8 +119,22 @@ $factures = $facture->AfficherFacturesArchives();
   </div>
 
   <div class="card-body">
+    <div class="row mb-3">
+      <div class="col-md-3">
+        <label for="archiveFacturesYearFilter" class="form-label">Filtrer par année</label>
+        <select id="archiveFacturesYearFilter" class="form-control">
+          <option value="">Toutes les années</option>
+          <?php foreach ($archiveYears as $year): ?>
+            <option value="<?= htmlspecialchars($year) ?>" <?= $selectedYear === $year ? 'selected' : '' ?>><?= htmlspecialchars($year) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button type="button" class="btn btn-secondary w-100" id="archiveFacturesYearApply">Filtrer</button>
+      </div>
+    </div>
     <div class="table-responsive">
-      <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+      <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0" data-year-filter="#archiveFacturesYearFilter" data-year-column="1">
         <thead>
           <tr>
             <th>Num Facture</th>
@@ -110,6 +152,28 @@ $factures = $facture->AfficherFacturesArchives();
         <tbody>
         <?php if (!empty($factures)): ?>
           <?php foreach ($factures as $key): ?>
+            <?php
+              $archiveSort = 0;
+              $archiveYear = '';
+              if (!empty($key['num_fact'])) {
+                  $parts = explode('/', $key['num_fact']);
+                  $numero = isset($parts[0]) ? (int)$parts[0] : 0;
+                  $annee  = isset($parts[1]) ? (int)$parts[1] : 0;
+                  $archiveSort = ($annee * 10000) + $numero;
+                  if ($annee > 0) {
+                      $archiveYear = (string)$annee;
+                  }
+              }
+              $dateYear = '';
+              if (!empty($key['date'])) {
+                  $maybeYear = substr((string)$key['date'], 0, 4);
+                  if (preg_match('/^\d{4}$/', $maybeYear)) {
+                      $dateYear = $maybeYear;
+                  }
+              }
+              $yearTokens = array_unique(array_filter([$archiveYear, $dateYear]));
+              $rowYearAttr = implode(' ', $yearTokens);
+            ?>
             <!-- Modal: Ajouter/Modifier Projets -->
             <div class="modal fade" id="AddProjets<?= (int)$key['id'] ?>" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
               <div class="modal-dialog">
@@ -136,9 +200,9 @@ $factures = $facture->AfficherFacturesArchives();
             </div>
             <!-- /Modal -->
 
-            <tr>
-              <td><span class="badge badge-success" style="font-size:100%;"><?= htmlspecialchars($key['num_fact'] ?? '') ?></span></td>
-              <td><?= htmlspecialchars($key['date'] ?? '') ?></td>
+            <tr<?php if (!empty($rowYearAttr)) { ?> data-year-values="<?= htmlspecialchars($rowYearAttr) ?>"<?php } ?>>
+              <td data-order="<?= $archiveSort ?>"><span class="badge badge-success" style="font-size:100%;"><?= htmlspecialchars($key['num_fact'] ?? '') ?></span></td>
+              <td><?php if ($rowYearAttr !== ''): ?><span class="d-none year-marker"><?= htmlspecialchars($rowYearAttr) ?></span><?php endif; ?><?= htmlspecialchars($key['date'] ?? '') ?></td>
               <td><?= htmlspecialchars($key['nom_client'] ?? '') ?></td>
               <td><?= htmlspecialchars($key['reglement'] ?? '') ?></td>
               <td><?= htmlspecialchars($key['typeReglement'] ?? '') ?></td>
@@ -174,3 +238,21 @@ $factures = $facture->AfficherFacturesArchives();
     </div>
   </div>
 </div>
+<script>
+(function(){
+  var btn=document.getElementById('archiveFacturesYearApply');
+  if(btn){
+    btn.addEventListener('click', function(){
+      var select=document.getElementById('archiveFacturesYearFilter');
+      var year=select?select.value:'';
+      var url=new URL(window.location.href);
+      if(year){
+        url.searchParams.set('year',year);
+      }else{
+        url.searchParams.delete('year');
+      }
+      window.location.href=url.toString();
+    });
+  }
+})();
+</script>

@@ -3,6 +3,34 @@ include_once 'class/OffresPrix.class.php';
 include_once 'class/client.class.php';
 $clients=$clt->getAllClients();
 $offres=$offre->AfficherOffres();
+$selectedYear = '';
+if (!empty($_GET['year']) && preg_match('/^\d{4}$/', $_GET['year'])) {
+	$selectedYear = $_GET['year'];
+}
+$offreYears = [];
+if (!empty($offres)) {
+	foreach ($offres as $row) {
+		$year = isset($row['date']) ? substr((string)$row['date'], 0, 4) : '';
+		if (preg_match('/^\d{4}$/', $year)) {
+			$offreYears[$year] = true;
+		}
+	}
+}
+$offreYears = array_keys($offreYears);
+rsort($offreYears, SORT_STRING);
+if ($selectedYear !== '') {
+	$offres = array_values(array_filter($offres, function ($row) use ($selectedYear) {
+		$date = isset($row['date']) ? (string)$row['date'] : '';
+		$num  = isset($row['num_offre']) ? (string)$row['num_offre'] : '';
+		if (strpos($date, $selectedYear) === 0) {
+			return true;
+		}
+		if (strpos($num, '/'.$selectedYear) !== false || strpos($num, $selectedYear.'/') === 0) {
+			return true;
+		}
+		return false;
+	}));
+}
 // Générer le num Offre
 $anne=date('Y');
 		if($offres){
@@ -126,8 +154,23 @@ else {echo "<script>alert('Erreur !!! ')</script>";}
 							</div>
                         
                         <div class="card-body">
+							<div class="row mb-3">
+								<div class="col-md-3">
+								<label for="offreYearFilter" class="form-label">Filtrer par année</label>
+								<select id="offreYearFilter" class="form-control">
+									<option value="">Toutes les années</option>
+									<?php foreach ($offreYears as $year) { ?>
+										<option value="<?= htmlspecialchars($year) ?>" <?= $selectedYear === $year ? 'selected' : '' ?>><?= htmlspecialchars($year) ?></option>
+									<?php } ?>
+								</select>
+							</div>
+							<div class="col-md-2 d-flex align-items-end">
+								<button type="button" class="btn btn-secondary w-100" id="offreYearApply">Filtrer</button>
+							</div>
+							</div>
+							</div>
                             <div class="table-responsive">
-                                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0" data-year-filter="#offreYearFilter" data-year-column="1">
                                     <thead>
                                         <tr>
 											<th >Num Offre</th>
@@ -155,6 +198,26 @@ if(!empty($ProjetsOffre)){foreach($ProjetsOffre as $projet){
 	else if($projet['prix_unit_htv']!=''){$verifForfitaireOffre='Nonforfitaire'; break;}
 	
 }}
+$offreSort = 0;
+$offreYear = '';
+if (!empty($key['num_offre'])) {
+	$parts = explode('/', $key['num_offre']);
+	$numero = isset($parts[0]) ? (int)$parts[0] : 0;
+	$annee  = isset($parts[1]) ? (int)$parts[1] : 0;
+	$offreSort = ($annee * 10000) + $numero;
+	if ($annee > 0) {
+		$offreYear = (string)$annee;
+	}
+}
+$offreDateYear = '';
+if (!empty($key['date'])) {
+	$maybeYear = substr((string)$key['date'], 0, 4);
+	if (preg_match('/^\d{4}$/', $maybeYear)) {
+		$offreDateYear = $maybeYear;
+	}
+}
+$yearTokens = array_unique(array_filter([$offreYear, $offreDateYear]));
+$rowYearAttr = implode(' ', $yearTokens);
 //echo '<h1> TypeOffre = '.$verifForfitaireOffre.'</h1>';
 ?>
 
@@ -293,12 +356,12 @@ if(!empty($ProjetsOffre)){foreach($ProjetsOffre as $projet){
   </div>
 </div>
 
-											 <tr>
-												<td><a href="#">
+											 <tr<?php if (!empty($rowYearAttr)) { ?> data-year-values="<?= htmlspecialchars($rowYearAttr) ?>"<?php } ?>>
+												<td data-order="<?=$offreSort?>"><a href="#">
 												  <?=$key['num_offre']?>
 												  </a>
 												  </td>
-												 <td><?=$key['date']?></td>
+												 <td><?php if($rowYearAttr!==''){?><span class="d-none year-marker"><?=htmlspecialchars($rowYearAttr)?></span><?php } ?><?=$key['date']?></td>
 												<td><?=$key['nom_client']?></td>
 												
 												  <td>
@@ -324,3 +387,21 @@ if(!empty($ProjetsOffre)){foreach($ProjetsOffre as $projet){
                             </div>
                         </div>
                     </div>
+<script>
+(function(){
+	var btn=document.getElementById('offreYearApply');
+	if(btn){
+		btn.addEventListener('click',function(){
+			var select=document.getElementById('offreYearFilter');
+			var year=select?select.value:'';
+			var url=new URL(window.location.href);
+			if(year){
+				url.searchParams.set('year',year);
+			}else{
+				url.searchParams.delete('year');
+			}
+			window.location.href=url.toString();
+		});
+	}
+})();
+</script>
