@@ -1,21 +1,45 @@
 <?php
 include 'class/Reglements.class.php';
 
+$Reglements = $reglement->getAll() ?? [];
+$selectedYear = '';
+if (!empty($_GET['year']) && preg_match('/^\d{4}$/', $_GET['year'])) {
+    $selectedYear = $_GET['year'];
+}
 
-$Reglements=$reglement->getAll();
 $reglementYears = [];
 if (!empty($Reglements)) {
-	foreach ($Reglements as $row) {
-		$year = isset($row['date']) ? substr((string)$row['date'], 0, 4) : '';
-		if (preg_match('/^\d{4}$/', $year)) {
-			$reglementYears[$year] = true;
-		}
-	}
+    foreach ($Reglements as $row) {
+        $year = isset($row['date']) ? substr((string)$row['date'], 0, 4) : '';
+        if (preg_match('/^\d{4}$/', $year)) {
+            $reglementYears[$year] = true;
+        }
+        if (!empty($row['num_fact'])) {
+            $parts = explode('/', (string)$row['num_fact']);
+            $maybeYear = isset($parts[1]) ? trim($parts[1]) : '';
+            if (preg_match('/^\d{4}$/', $maybeYear)) {
+                $reglementYears[$maybeYear] = true;
+            }
+        }
+    }
 }
 $reglementYears = array_keys($reglementYears);
 rsort($reglementYears, SORT_STRING);
-	
- ?>
+
+if ($selectedYear !== '') {
+    $Reglements = array_values(array_filter($Reglements, function ($row) use ($selectedYear) {
+        $date = isset($row['date']) ? (string)$row['date'] : '';
+        $num  = isset($row['num_fact']) ? (string)$row['num_fact'] : '';
+        if (strpos($date, $selectedYear) === 0) {
+            return true;
+        }
+        if (strpos($num, '/'.$selectedYear) !== false || strpos($num, $selectedYear.'/') === 0) {
+            return true;
+        }
+        return false;
+    }));
+}
+?>
 <!-- DataTales Example -->
                     <div class="card shadow mb-4">
                       
@@ -23,13 +47,16 @@ rsort($reglementYears, SORT_STRING);
                         <div class="card-body">
 							<div class="row mb-3">
 								<div class="col-md-3">
-									<label for="reglementsYearFilter" class="form-label">Filtrer par ann�e</label>
+									<label for="reglementsYearFilter" class="form-label">Filtrer par ann&eacute;e</label>
 									<select id="reglementsYearFilter" class="form-control">
-										<option value="">Toutes les ann�es</option>
+										<option value="">Toutes les ann&eacute;es</option>
 										<?php foreach ($reglementYears as $year) { ?>
-											<option value="<?= htmlspecialchars($year) ?>"><?= htmlspecialchars($year) ?></option>
+											<option value="<?= htmlspecialchars($year) ?>" <?= $selectedYear === $year ? 'selected' : '' ?>><?= htmlspecialchars($year) ?></option>
 										<?php } ?>
 									</select>
+								</div>
+								<div class="col-md-2 d-flex align-items-end">
+									<button type="button" class="btn btn-secondary w-100" id="reglementsYearApply">Filtrer</button>
 								</div>
 							</div>
                             <div class="table-responsive">
@@ -143,7 +170,7 @@ rsort($reglementYears, SORT_STRING);
 									 </td>
 									 <td>
 												<?php if($cle['pieceRs']){?>
-												<a href="./pages/Reglements/PiecesRS/<?=$cle['pieceRs']?>">Télécharger </a>
+												<a href="./pages/Reglements/PiecesRS/<?=$cle['pieceRs']?>">T&eacute;l&eacute;charger </a>
 												<?php } ?>
 												
 												
@@ -164,3 +191,24 @@ rsort($reglementYears, SORT_STRING);
                             </div>
                         </div>
                     </div>
+
+
+
+<script>
+(function(){
+	var applyBtn=document.getElementById('reglementsYearApply');
+	if(applyBtn){
+		applyBtn.addEventListener('click',function(){
+			var select=document.getElementById('reglementsYearFilter');
+			var year=select ? select.value : '';
+			var url=new URL(window.location.href);
+			if(year){
+				url.searchParams.set('year',year);
+			}else{
+				url.searchParams.delete('year');
+			}
+			window.location.href=url.toString();
+		});
+	}
+})();
+</script>

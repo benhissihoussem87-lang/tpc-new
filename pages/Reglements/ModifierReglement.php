@@ -1,7 +1,8 @@
-<?php
+﻿<?php
 include 'class/Reglements.class.php';
 include 'class/client.class.php';
 include 'class/Factures.class.php';
+include_once 'pages/Reglements/reglement_form_helpers.php';
 $clients=$clt->getAllClients();
 $factures=$facture->AfficherFactures();
 // verfif Facture a reglement ou Non
@@ -9,13 +10,20 @@ $factures=$facture->AfficherFactures();
 @$detailReglement=$reglement->getReglementByFacture($_GET['Facture']);
 //var_dump($detailReglement);
 //echo '<h1> TypeReglement '.$detailReglement['TypeReglement'].'</h1>';
-$typeReglement=explode(',',$detailReglement['TypeReglement']);
-$NumCheques=explode(',',$detailReglement['num_cheque']);
-$DateCheques=explode(',',$detailReglement['date_cheque']);
-$Montants=explode(',',$detailReglement['montant']);
-$DateReglements=explode(',',$detailReglement['dateReglement']);
+if ($detailReglement && is_array($detailReglement)) {
+    $typeReglement=explode(',',$detailReglement['TypeReglement'] ?? '');
+    $NumCheques=explode(',',$detailReglement['num_cheque'] ?? '');
+    $DateCheques=explode(',',$detailReglement['date_cheque'] ?? '');
+    $Montants=explode(',',$detailReglement['montant'] ?? '');
+    $DateReglements=explode(',',$detailReglement['dateReglement'] ?? '');
+} else {
+    $typeReglement = $NumCheques = $DateCheques = $Montants = $DateReglements = [];
+    $detailReglement = null;
+}
+$reglementRows = tpc_reglement_rows_from_arrays($typeReglement, $NumCheques, $DateCheques, $Montants, $DateReglements);
 //echo '<h1> Cheque  1 '.@$NumCheques[0].'</h1>';
 @$detailFacture=$facture->detailFacture($_GET['Facture']);
+$etatReglementCourant = strtolower(trim((string)($detailReglement['etat_reglement'] ?? 'Non')));
 if(isset($detailFacture)){
 	$date=@$detailFacture['date'];
 	$nbCommandeClient=@$detailFacture['numboncommande'];
@@ -44,13 +52,14 @@ else{$numBonCommandeFacture=null;}
       $montant=@implode(",",array_filter($_POST['montant'], 'strlen'));
 	  $dateReglement=@implode(",",array_filter($_POST['dateReglement'], 'strlen'));
 	  */
-	   $typeReglement=@implode(",",$_POST['typeReglement']);
-		$numCheque=@implode(",",$_POST['numCheque']);
+        $reglementLines = tpc_reglement_prepare_post($_POST);
+	   $typeReglement=implode(",",$reglementLines['typeReglement']);
+		$numCheque=implode(",",$reglementLines['numCheque']);
 	  $etatReglement=$_POST['etatReglement'];
-	  $dateCheque=@implode(",",$_POST['dateCheque']);
+	  $dateCheque=implode(",",$reglementLines['dateCheque']);
 	  $retenueCheque=$_POST['retenueCheque'];
-      $montant=@implode(",",$_POST['montant']);
-	  $dateReglement=@implode(",",$_POST['dateReglement']);
+      $montant=implode(",",$reglementLines['montant']);
+	  $dateReglement=implode(",",$reglementLines['dateReglement']);
      if($reglement->Modifier(@$_POST['facture'],@$_POST['prixTTC'],@$etatReglement,@$numCheque,@$dateCheque,@$retenueCheque,@$typeReglement,@$montant,@$dateReglement,str_replace("'","\'",@$_FILES['pieceRs']['name'])))		 {
 		    if($_FILES['pieceRs']['name']!=''){
 	@copy($_FILES['pieceRs']['tmp_name'],'pages/Reglements/PiecesRS/'.$_FILES['pieceRs']['name']);
@@ -61,7 +70,7 @@ else{$numBonCommandeFacture=null;}
 	  }
  }
 ?>
-<!--  Détail ****-->
+<!--  DÃ©tail ****-->
 
 
 
@@ -115,9 +124,13 @@ else{$numBonCommandeFacture=null;}
 				<div class="mb-3 col-2" >
 				<label for="etatReglement" class="col-form-label">Etat Reglement:</label>
 				<select class="form-control" id="etatReglement" value="<?=@$detailReglement['prix_ttc']?>" name="etatReglement">
-				 <option value="oui" <?php if($detailReglement['etat_reglement']=='oui'){?> selected <?php } ?> >Oui</option>
-			  <option value="non" <?php if($detailReglement['etat_reglement']=='non'){?> selected <?php } ?> >Non</option>
-			  <option value="Avance" <?php if($detailReglement['etat_reglement']=='Avance'){?> selected <?php } ?> >Avance</option>
+                    <?php
+                    $etatOptions = ['Oui','Non','Avance','Avoir'];
+                    foreach ($etatOptions as $option) {
+                        $selected = ($etatReglementCourant === strtolower($option)) ? 'selected' : '';
+                        ?>
+                        <option value="<?=$option?>" <?=$selected?>><?=$option?></option>
+                    <?php } ?>
 				</select>
 				   
 			</div>
@@ -132,41 +145,13 @@ else{$numBonCommandeFacture=null;}
 				<input type="date" class="form-control" value="<?=@$detailReglement['retenue_date']?>" id="retenueCheque" name="retenueCheque"/>
 				   
 			</div>
-		<?php for($i=0;$i<5;$i++){?>
-			<div class="mb-3 col-2" >
-				<label for="typeReglement" class="col-form-label">Type Reglement :</label>
-				<input list="typesReglement" value="<?=@$typeReglement[$i]?>" class="form-control"  id="typeReglement" name="typeReglement[]"  />
-				<datalist id="typesReglement">
-					  <option value="Chèque"></option>
-					  <option value="Espèce"></option>
-					  
-					</datalist>
-			</div>
-			
-			<div class="mb-3 col-3" >
-				<label for="numCheque" class="col-form-label">N° Cheque :</label>
-				<input type="text" value="<?=@$NumCheques[$i]?>" class="form-control" id="numCheque" name="numCheque[]"/>
-				   
-			</div>
-			
-			<div class="mb-3 col-2" >
-				<label for="dateCheque" class="col-form-label">Date Cheque:</label>
-				<input type="date" class="form-control" value="<?=@$DateCheques[$i]?>" id="dateCheque" name="dateCheque[]"/>
-				   
-			</div>
-			
-		<div class="mb-3 col-2" >
-				<label for="montant" class="col-form-label">Montant :</label>
-				<input type="text" class="form-control" <?php if($detailReglement){?>value='<?=@$Montants[$i]?>'<?php } ?> id="montant" name="montant[]"/>
-				   
-			</div>
-			
-		<div class="mb-3 col-2" >
-				<label for="dateReglement" class="col-form-label">Date Reglement:</label>
-				<input type="date" class="form-control" <?php if($detailReglement){?> value='<?=@$DateReglements[$i]?>'<?php } ?> id="dateReglement" name="dateReglement[]"/>
-				   
-			</div>
-    <?php }?>
+		    <?php
+    $reglementRowsId = 'reglementRows';
+    $reglementTemplateId = 'reglement-row-template';
+    $reglementTypeDatalistId = 'reglement-type-options';
+    $addButtonLabel = 'Ajouter un reglement';
+    include 'pages/Reglements/partials/reglement_rows.php';
+    ?>
 		  </div>
 		
 
@@ -193,3 +178,5 @@ else{$numBonCommandeFacture=null;}
 						  </div>
                      
                     </div>
+
+

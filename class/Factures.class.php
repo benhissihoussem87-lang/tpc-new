@@ -153,7 +153,7 @@ class Factures {
             FROM facture AS f
             JOIN clients AS clt ON f.client = clt.id
             LEFT JOIN reglement AS r ON r.num_fact = f.num_fact
-            WHERE LOWER(TRIM(COALESCE(r.etat_reglement, 'non'))) <> 'oui'
+            WHERE LOWER(TRIM(COALESCE(r.etat_reglement, 'non'))) NOT IN ('oui','avoir')
             ORDER BY f.date DESC
         ";
         $req = $this->cnx->query($sql);
