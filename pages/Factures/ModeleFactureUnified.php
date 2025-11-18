@@ -10,8 +10,9 @@ $isExonore           = $isExonore           ?? false;
 
 $bonCommandeValue = '';
 $bonCommandeValue = trim((string)($infosFacture['numboncommande'] ?? ''));
-if ($bonCommandeValue === '') {
-  $bonCommandeValue = trim((string)($infosFacture['num_bon_commandeClient'] ?? ''));
+$numFactValue = trim((string)($infosFacture['num_fact'] ?? ''));
+if ($bonCommandeValue !== '' && $numFactValue !== '' && strcasecmp($bonCommandeValue, $numFactValue) === 0) {
+  $bonCommandeValue = '';
 }
 
 // Nombre => lettres (FR) + Dinars/Millimes
