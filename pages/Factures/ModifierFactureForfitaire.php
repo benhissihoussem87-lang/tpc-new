@@ -31,7 +31,7 @@ foreach($ProjetsFacture as $p){
   if($verifFactureInProjetsFacture){
 	//echo '<h1> Facture existe avec l\'adresse '.$_POST['adresseClient'].'</h1>';
 	// Modifier Facture
- 	$facture->Modifier(@$_POST['num_fact'],@$_POST['client'],@$_POST['num_fact'],@$_POST['date'],@$_POST['reglement']);
+ 	$facture->Modifier(@$_POST['num_fact'],@$_POST['client'],@$_POST['numboncommande'],@$_POST['date'],@$_POST['reglement']);
     // delete All Project By Facture de num $_POST['num_fact']
 	if($facture->delete_All_Projets_By_FactureAndMultiAdress(@$_POST['num_fact'],@$_POST['adresseClient'])){
 	// Ajout Projet Facture
@@ -64,7 +64,7 @@ foreach($ProjetsFacture as $p){
   else {
 	//  echo '<h1> Facture n\'existe pas avec l\'adresse '.$_POST['adresseClient'].'</h1>';
 	  // Modifier Facture
- 	$facture->Modifier(@$_POST['num_fact'],@$_POST['client'],@$_POST['num_fact'],@$_POST['date'],@$_POST['reglement']);
+ 	$facture->Modifier(@$_POST['num_fact'],@$_POST['client'],@$_POST['numboncommande'],@$_POST['date'],@$_POST['reglement']);
 	// Ajout Projet Facture
 		$facture->AjoutProjets_Facture(@$_POST['num_fact'],'',
 		'ENS','','',@$_POST['prixForfitaire'][0],'',@$_POST['projet'][0],@$_POST['adresseClient']

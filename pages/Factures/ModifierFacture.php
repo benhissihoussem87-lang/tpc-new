@@ -35,7 +35,7 @@ $bonCommandeClient=$bonCommande->getDetailBonCommandeByNumFacture($_GET['modifie
  if($verifFactureInProjetsFacture){
 	 
  // Modifier Facture
- 	$facture->Modifier(@$_POST['num_fact'],@$_POST['client'],@$_POST['num_fact'],@$_POST['date'],@$_POST['reglement']);
+ 	$facture->Modifier(@$_POST['num_fact'],@$_POST['client'],@$_POST['numboncommande'],@$_POST['date'],@$_POST['reglement']);
 	
     // delete All Project lines then re-insert from the form (for the selected address)
     if($facture->delete_All_Projets_By_FactureAndMultiAdress(@$_POST['num_fact'],@$_POST['adresseClient'])){

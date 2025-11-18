@@ -182,9 +182,62 @@ class Factures {
     }
 
     public function GetBonCommandeByFacture($facture) {
-        $st = $this->cnx->prepare("SELECT numboncommande FROM facture WHERE num_fact = :f LIMIT 1");
-        $st->execute([':f' => $facture]);
-        return $st->fetch();
+        $facture = (string)$facture;
+        $result = null;
+
+        // Try dedicated bon_commande table first so we can expose client number + date
+        $st = $this->cnx->prepare("
+            SELECT num_bon_commande,
+                   num_bon_commandeClient,
+                   date_bon_commande,
+                   piecejointe
+            FROM bon_commande
+            WHERE num_bon_commande = :num
+            LIMIT 1
+        ");
+        $st->execute([':num' => $facture]);
+        $row = $st->fetch();
+        if ($row) {
+            $display = trim((string)($row['num_bon_commandeClient'] ?? ''));
+            if ($display === '') {
+                $display = trim((string)($row['num_bon_commande'] ?? ''));
+            }
+            $result = [
+                'numboncommande' => $display,
+                'num_bon_commande' => $row['num_bon_commande'] ?? null,
+                'num_bon_commandeClient' => $row['num_bon_commandeClient'] ?? null,
+                'date_bon_commande' => $row['date_bon_commande'] ?? null,
+                'piecejointe' => $row['piecejointe'] ?? null,
+            ];
+        }
+
+        // Fallback to facture table column if nothing in bon_commande
+        if (!$result) {
+            $st = $this->cnx->prepare("SELECT numboncommande FROM facture WHERE num_fact = :f LIMIT 1");
+            $st->execute([':f' => $facture]);
+            $row = $st->fetch();
+            if ($row && isset($row['numboncommande'])) {
+                $display = trim((string)$row['numboncommande']);
+                if ($display === '') {
+                    $display = $facture;
+                }
+                $result = [
+                    'numboncommande' => $display,
+                    'num_bon_commande' => $facture,
+                    'num_bon_commandeClient' => $row['numboncommande'],
+                ];
+            }
+        }
+
+        if (!$result) {
+            $result = [
+                'numboncommande' => $facture,
+                'num_bon_commande' => $facture,
+                'num_bon_commandeClient' => null,
+            ];
+        }
+
+        return $result;
     }
 
     // Detail of a single facture joined with client info
