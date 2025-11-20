@@ -68,7 +68,7 @@ class Reglements{
             $st = $this->cnx->prepare("SELECT * FROM reglement WHERE id_reglement = :id LIMIT 1");
             $st->execute([':id' => $facture]);
         } else {
-            $st = $this->cnx->prepare("SELECT * FROM reglement WHERE num_fact = :num LIMIT 1");
+            $st = $this->cnx->prepare("SELECT * FROM reglement WHERE num_fact = :num ORDER BY id_reglement DESC LIMIT 1");
             $st->execute([':num' => $facture]);
         }
         return $st->fetch();
@@ -79,7 +79,7 @@ class Reglements{
             $st = $this->cnx->prepare("SELECT * FROM archive_reglement WHERE id = :id LIMIT 1");
             $st->execute([':id' => $facture]);
         } else {
-            $st = $this->cnx->prepare("SELECT * FROM archive_reglement WHERE num_fact_archive = :num LIMIT 1");
+            $st = $this->cnx->prepare("SELECT * FROM archive_reglement WHERE num_fact_archive = :num ORDER BY id DESC LIMIT 1");
             $st->execute([':num' => $facture]);
         }
         return $st->fetch();
