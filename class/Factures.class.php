@@ -76,6 +76,17 @@ class Factures {
             $stBc = $this->cnx->prepare("DELETE FROM bon_commande WHERE num_bon_commande = :num");
             $stBc->execute([':num' => $num]);
 
+            // Remove Bordereaux created during the flow (both num_fact and num_bordereaux might match the facture)
+            $stBd = $this->cnx->prepare("DELETE FROM bordereaux WHERE num_fact = :num OR num_bordereaux = :num");
+            $stBd->execute([':num' => $num]);
+
+            // Remove mirrored Offre de Prix + its lines created alongside the facture
+            $stOffreLines = $this->cnx->prepare("DELETE FROM offres_projets WHERE offre = :num");
+            $stOffreLines->execute([':num' => $num]);
+
+            $stOffre = $this->cnx->prepare("DELETE FROM offre_prix WHERE num_offre = :num");
+            $stOffre->execute([':num' => $num]);
+
             // Also clean detail lines if no FK is present
             $stLines = $this->cnx->prepare("DELETE FROM facture_projets WHERE facture = :num");
             $stLines->execute([':num' => $num]);
@@ -147,13 +158,13 @@ class Factures {
 
     public function AfficherFacturesNonRegle() {
         // Only show invoices that are NOT paid according to the `reglement` table.
-        // Logic: include factures with no reglement row OR etat_reglement not equal to 'oui'/'Oui'.
+        // Logic: include factures with no reglement row OR etat_reglement not equal to 'oui'/'Oui'/'avance'.
         $sql = "
             SELECT f.*, clt.nom_client, clt.adresse, clt.numexonoration
             FROM facture AS f
             JOIN clients AS clt ON f.client = clt.id
             LEFT JOIN reglement AS r ON r.num_fact = f.num_fact
-            WHERE LOWER(TRIM(COALESCE(r.etat_reglement, 'non'))) NOT IN ('oui','avoir')
+            WHERE LOWER(TRIM(COALESCE(r.etat_reglement, 'non'))) NOT IN ('oui','avoir','avance')
             ORDER BY f.date DESC
         ";
         $req = $this->cnx->query($sql);

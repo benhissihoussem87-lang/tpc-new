@@ -19,13 +19,24 @@ class Reglements{
         return ($value === '') ? null : $value;
     }
 
+    private function normalizeEtatReglement($value) {
+        $value = $this->normalizeString($value);
+        if ($value === null) { return null; }
+        $normalized = strtolower($value);
+        if ($normalized === 'avance') { return 'Oui'; }
+        if ($normalized === 'oui')    { return 'Oui'; }
+        if ($normalized === 'avoir')  { return 'Avoir'; }
+        if ($normalized === 'non')    { return 'Non'; }
+        return ucfirst($normalized);
+    }
+
     public function Ajout($client,$facture,$prix_ttc,$etat_reglement,$num_cheque,$date_cheque,$retenue_cheque,$reglementEspece,$montant,$dateReglement,$pieceRs){
         $prix_ttc = $this->normalizeDecimal($prix_ttc);
         $montant  = $this->normalizeDecimal($montant);
         $retenue_cheque = $this->normalizeDate($retenue_cheque);
         $date_cheque    = $this->normalizeDate($date_cheque);
         $dateReglement  = $this->normalizeDate($dateReglement);
-        $etat_reglement = $this->normalizeString($etat_reglement);
+        $etat_reglement = $this->normalizeEtatReglement($etat_reglement);
         $num_cheque     = $this->normalizeString($num_cheque);
         $reglementEspece= $this->normalizeString($reglementEspece);
         $pieceRs        = $this->normalizeString($pieceRs);
@@ -95,7 +106,7 @@ class Reglements{
         $retenue_cheque = $this->normalizeDate($retenue_cheque);
         $date_cheque    = $this->normalizeDate($date_cheque);
         $dateReglement  = $this->normalizeDate($dateReglement);
-        $etat_reglement = $this->normalizeString($etat_reglement);
+        $etat_reglement = $this->normalizeEtatReglement($etat_reglement);
         $num_cheque     = $this->normalizeString($num_cheque);
         $TypeReglement  = $this->normalizeString($TypeReglement);
         $pieceRs        = $this->normalizeString($pieceRs);
@@ -130,7 +141,7 @@ public function AjoutArchive($client,$facture,$prix_ttc,$etat_reglement,$num_che
         $retenue_cheque = $this->normalizeDate($retenue_cheque);
         $date_cheque    = $this->normalizeDate($date_cheque);
         $dateReglement  = $this->normalizeDate($dateReglement);
-        $etat_reglement = $this->normalizeString($etat_reglement);
+        $etat_reglement = $this->normalizeEtatReglement($etat_reglement);
         $num_cheque     = $this->normalizeString($num_cheque);
         $reglementEspece= $this->normalizeString($reglementEspece);
         $pieceRs        = $this->normalizeString($pieceRs);
@@ -154,6 +165,7 @@ public function AjoutArchive($client,$facture,$prix_ttc,$etat_reglement,$num_che
         ]);
     }	
 public function ModifierArchive($facture,$prix_ttc,$etat_reglement,$num_cheque,$date_cheque,$retenue_cheque,$TypeReglement,$montant,$dateReglement,$pieceRs){
+        $etat_reglement = $this->normalizeEtatReglement($etat_reglement);
 		 $sql="UPDATE `archive_reglement` SET prix_ttc='$prix_ttc',etat_reglement='$etat_reglement',num_cheque='$num_cheque',date_cheque='$date_cheque',retenue_date='$retenue_cheque',TypeReglement='$TypeReglement',montant='$montant',dateReglement='$dateReglement',pieceRs='$pieceRs' where num_fact_archive ='$facture'  ";
 		 $result=$this->cnx->exec($sql);
 		 if($result)return true;

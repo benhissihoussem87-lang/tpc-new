@@ -290,27 +290,33 @@ $anne=date('Y');
                     <?= htmlspecialchars($bonCommandeFacture['numboncommande'] ?? '') ?>
 												<?php } ?>
 												</td>
-                    <td><?= htmlspecialchars($key['numexonoration'] ?? '') ?></td>
-												<td>
-												<?php if(empty($reglementFacture)){
-													echo 'Pas de reglement ';
-												}
-												else {
-													?>
-												<?=$reglementFacture['etat_reglement']?>
-												<?php } ?></td>
-												<td>
-												<?php if(empty($reglementFacture)){
-													echo 'Pas de reglement ';
-												}
-												else {
-													$reglementTypes=explode(',',$reglementFacture['TypeReglement']);
-													for($i=0;$i<count($reglementTypes);$i++){
-												if(!empty($reglementTypes[$i])){
-													?>
-												<?=$reglementTypes[$i].','?>
-													<?php }} }?>
-												</td>
+												<td><?= htmlspecialchars($key['numexonoration'] ?? '') ?></td>
+												<?php
+                                                // Etat de reglement : always show Oui/Non (treat Avance/Avoir as paid)
+                                                $etatReglementAffiche = 'Non';
+                                                if (!empty($reglementFacture)) {
+                                                    $etatReglementBrut = strtolower(trim((string)($reglementFacture['etat_reglement'] ?? '')));
+                                                    if (in_array($etatReglementBrut, ['oui','avance','avoir'], true)) {
+                                                        $etatReglementAffiche = 'Oui';
+                                                    }
+                                                } else {
+                                                    $etatFactureBrut = strtolower(trim((string)($key['reglement'] ?? '')));
+                                                    if ($etatFactureBrut === 'oui') {
+                                                        $etatReglementAffiche = 'Oui';
+                                                    }
+                                                }
+
+                                                // Types de reglement (show '-' when none)
+                                                $typesAffiche = '-';
+                                                if (!empty($reglementFacture) && isset($reglementFacture['TypeReglement'])) {
+                                                    $reglementTypes = array_filter(array_map('trim', explode(',', (string)$reglementFacture['TypeReglement'])));
+                                                    if (!empty($reglementTypes)) {
+                                                        $typesAffiche = htmlspecialchars(implode(', ', $reglementTypes));
+                                                    }
+                                                }
+                                                ?>
+												<td><?=$etatReglementAffiche?></td>
+												<td><?=$typesAffiche?></td>
 												
 												  <td>
 												  <!--<a href="?Factures&deleteFacture=<?=$key['num_fact']?>" class="btn btn-danger" onclick="if(!confirm('Voulez-vous supprimer la facture <?=$key['num_fact']?>')) return false">Supp</a>-->
