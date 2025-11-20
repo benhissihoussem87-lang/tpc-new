@@ -2,19 +2,32 @@
 include 'class/BonsCommandes.class.php';
 
 // detail Bon commande 
-@$detailBonCommande=$bonCommande->detailBC($_GET['BC']);
-$numBonCommandeFacture=$_GET['BC']; 
-//var_dump($detailBonCommande);
-/***************************************/
+$bcParam = $_GET['BC'] ?? null;
+$detailBonCommande = null;
+if ($bcParam !== null) {
+    $detailBonCommande = $bonCommande->detailBC($bcParam);
+}
+$numBonCommandeFacture = $bcParam;
+
+// Safeguard when nothing is found
+if (!$detailBonCommande) {
+    echo "<div class=\"alert alert-danger\">Bon de commande introuvable.</div>";
+    return;
+}
+
 // Ajout Bon Commande
- $infoFacture=$bonCommande->getInfosFactureByBonCommande($detailBonCommande['num_bon_commande']);
- foreach($infoFacture as $info);
- 
- $client=null;
-if(empty($detailBonCommande['client'])){
-	
-	$client=$info['nom_client'];}
-  else {$client=$detailBonCommande['client'];}
+$infoFacture = $bonCommande->getInfosFactureByBonCommande($detailBonCommande['num_bon_commande']);
+$info = null;
+if (!empty($infoFacture)) {
+    foreach ($infoFacture as $infoRow) { $info = $infoRow; }
+}
+
+$client = null;
+if (empty($detailBonCommande['client'])) {
+    $client = $info['nom_client'] ?? '';
+} else {
+    $client = $detailBonCommande['client'];
+}
 
  if(isset($_REQUEST['btnSubmitAjout'])){
 
