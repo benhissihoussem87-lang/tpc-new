@@ -61,48 +61,91 @@ class Factures {
     }
 
     public function deleteFacture($num) {
-        // Ensure we remove any linked Bon de Commande when a facture is deleted.
+        // Ensure we remove any linked entities when a facture is deleted.
         // Do it in a transaction so we don't leave partial state.
+        $cleanNum = trim((string)$num);
         try {
             $this->cnx->beginTransaction();
+            $this->disableForeignKeyChecks();
 
             // Remove payment records before dropping the facture itself so
-            // orphaned entries don't linger in the `reglement` table.
-            $stReg = $this->cnx->prepare("DELETE FROM reglement WHERE num_fact = :num");
-            $stReg->execute([':num' => $num]);
+            // orphaned entries don't linger in the `reglement` tables.
+            $this->safeExecute("DELETE FROM reglement WHERE num_fact = :num", [':num' => $cleanNum]);
+            $this->safeExecute("DELETE FROM archive_reglement WHERE num_fact_archive = :num", [':num' => $cleanNum]);
 
             // Remove Bon de Commande tied to this facture number
             // (Many pages use bon_commande.num_bon_commande == facture.num_fact)
-            $stBc = $this->cnx->prepare("DELETE FROM bon_commande WHERE num_bon_commande = :num");
-            $stBc->execute([':num' => $num]);
+            $this->safeExecute("DELETE FROM bon_commande WHERE num_bon_commande = :num", [':num' => $cleanNum]);
 
             // Remove Bordereaux created during the flow (both num_fact and num_bordereaux might match the facture)
-            $stBd = $this->cnx->prepare("DELETE FROM bordereaux WHERE num_fact = :num OR num_bordereaux = :num");
-            $stBd->execute([':num' => $num]);
+            $this->safeExecute(
+                "DELETE FROM bordereaux WHERE num_fact = :num_fact OR num_bordereaux = :num_bord",
+                [':num_fact' => $cleanNum, ':num_bord' => $cleanNum]
+            );
+            $this->safeExecute("DELETE FROM archive_bordereaux WHERE num_fact = :num", [':num' => $cleanNum]);
 
             // Remove mirrored Offre de Prix + its lines created alongside the facture
-            $stOffreLines = $this->cnx->prepare("DELETE FROM offres_projets WHERE offre = :num");
-            $stOffreLines->execute([':num' => $num]);
+            $this->safeExecute("DELETE FROM offres_projets WHERE offre = :num", [':num' => $cleanNum]);
+            $this->safeExecute("DELETE FROM offre_prix WHERE num_offre = :num", [':num' => $cleanNum]);
+            $this->safeExecute("DELETE FROM archiveoffre WHERE factureArchive = :num", [':num' => $cleanNum]);
 
-            $stOffre = $this->cnx->prepare("DELETE FROM offre_prix WHERE num_offre = :num");
-            $stOffre->execute([':num' => $num]);
+            // Clean any avoir/credit notes referencing this facture so FK constraints cannot block deletion
+            $this->safeExecute(
+                "DELETE FROM facture_avoir_lignes WHERE avoir_id IN (SELECT id FROM facture_avoir WHERE num_fact = :num1 OR num_fact_new = :num2)",
+                [':num1' => $cleanNum, ':num2' => $cleanNum]
+            );
+            $this->safeExecute("DELETE FROM facture_avoir WHERE num_fact = :num1 OR num_fact_new = :num2", [':num1' => $cleanNum, ':num2' => $cleanNum]);
 
             // Also clean detail lines if no FK is present
-            $stLines = $this->cnx->prepare("DELETE FROM facture_projets WHERE facture = :num");
-            $stLines->execute([':num' => $num]);
+            $this->safeExecute(
+                "DELETE FROM facture_projets WHERE facture = :num_fact OR facture = TRIM(:num_trim)",
+                [':num_fact' => $cleanNum, ':num_trim' => $cleanNum]
+            );
 
             // Finally delete the facture itself
-            $st = $this->cnx->prepare("DELETE FROM facture WHERE num_fact = :num");
-            $st->execute([':num' => $num]);
+            $st = $this->cnx->prepare("DELETE FROM facture WHERE num_fact = :num_fact OR num_fact = TRIM(:num_trim)");
+            $st->execute([':num_fact' => $cleanNum, ':num_trim' => $cleanNum]);
+            $deleted = ($st->rowCount() > 0);
 
+            $this->enableForeignKeyChecks();
             $this->cnx->commit();
-            return true;
+            return $deleted;
         } catch (\Exception $e) {
             if ($this->cnx->inTransaction()) {
                 $this->cnx->rollBack();
             }
+            // Surface the failure for debugging (web server error log)
+            error_log('[Factures::deleteFacture] Delete failed for '.$cleanNum.' -> '.$e->getMessage());
+            $this->enableForeignKeyChecks();
             return false;
         }
+    }
+
+    /**
+     * Execute a DELETE and ignore "table not found" errors so older databases
+     * missing optional tables (offres_projets, facture_avoir, etc.) do not
+     * block facture deletion.
+     */
+    private function safeExecute(string $sql, array $params = []): void {
+        try {
+            $stmt = $this->cnx->prepare($sql);
+            $stmt->execute($params);
+        } catch (\PDOException $e) {
+            $code = $e->getCode();
+            $msg  = $e->getMessage();
+            if ($code === '42S02' || stripos($msg, 'Base table or view not found') !== false) {
+                return;
+            }
+            throw $e;
+        }
+    }
+
+    private function disableForeignKeyChecks(): void {
+        try { $this->cnx->exec("SET FOREIGN_KEY_CHECKS=0"); } catch (\PDOException $e) { /* ignore */ }
+    }
+
+    private function enableForeignKeyChecks(): void {
+        try { $this->cnx->exec("SET FOREIGN_KEY_CHECKS=1"); } catch (\PDOException $e) { /* ignore */ }
     }
 
     public function deleteFactureByAdresse($num, $adresse, $unused = null) {

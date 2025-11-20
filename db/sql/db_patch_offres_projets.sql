@@ -1,0 +1,17 @@
+CREATE TABLE IF NOT EXISTS offres_projets (
+  id_Projets_Offre INT(11) NOT NULL AUTO_INCREMENT,
+  offre VARCHAR(20) NOT NULL,
+  prix_unit_htv VARCHAR(100) DEFAULT NULL,
+  qte VARCHAR(100) DEFAULT NULL,
+  tva VARCHAR(200) DEFAULT NULL,
+  remise VARCHAR(200) DEFAULT NULL,
+  prixForfitaire VARCHAR(200) DEFAULT NULL,
+  prixTTC VARCHAR(200) DEFAULT NULL,
+  projet INT(11) DEFAULT NULL,
+  adresseClient VARCHAR(250) DEFAULT NULL,
+  PRIMARY KEY (id_Projets_Offre),
+  KEY offre (offre),
+  KEY projet (projet),
+  CONSTRAINT fk_offres_projets_offre FOREIGN KEY (offre) REFERENCES offre_prix(num_offre) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_offres_projets_projet FOREIGN KEY (projet) REFERENCES projet(id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
