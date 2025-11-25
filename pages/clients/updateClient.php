@@ -32,7 +32,8 @@ if ($clt->Modifier($type, $convention, $pieceConventionName, $nom, $code, $adres
         @move_uploaded_file($_FILES['piececonvention']['tmp_name'], 'pieceConventionClients/' . $pieceConventionName);
     }
 
-    echo "<script>document.location.href='/tpc/main.php?Gestion_Clients'</script>";
+    // Redirect back to the clients list (root deployment path)
+    echo "<script>document.location.href='/main.php?Gestion_Clients'</script>";
 } else {
     echo "<script>alert('Erreur !!! ')</script>";
 }

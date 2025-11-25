@@ -97,7 +97,7 @@
                 <div class="modal-body">Voulez-vous quitter ??.</div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" type="button" data-dismiss="modal">Annuler</button>
-                    <a class="btn btn-primary" href="/tpc/index.php">Logout</a>
+                    <a class="btn btn-primary" href="/index.php">Logout</a>
                 </div>
             </div>
         </div>
