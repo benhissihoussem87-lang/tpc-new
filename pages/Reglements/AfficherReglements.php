@@ -37,8 +37,29 @@ $Reglements=$reglement->getAll();
 							($key['nom_client'] ?? '').' '.
 							implode(' ', array_column($DetailReglements, 'etat_reglement'))
 						));
+						// Build year tags from facture num + cheque/retention dates
+						$yearTags = [];
+						if (preg_match_all('/\\b(20\\d{2})\\b/', (string)$key['num_fact'], $m)) {
+							$yearTags = array_merge($yearTags, $m[1]);
+						}
+						foreach ($DetailReglements as $cle) {
+							$datesAll = [];
+							if (!empty($cle['date_cheque'])) {
+								$datesAll = array_merge($datesAll, explode(',', $cle['date_cheque']));
+							}
+							if (!empty($cle['retenue_date'])) {
+								$datesAll = array_merge($datesAll, explode(',', $cle['retenue_date']));
+							}
+							foreach ($datesAll as $d) {
+								if (preg_match('/\\b(20\\d{2})\\b/', $d, $m)) {
+									$yearTags[] = $m[1];
+								}
+							}
+						}
+						$yearTags = array_unique($yearTags);
+						$yearValuesAttr = htmlspecialchars(implode(' ', $yearTags));
 						?>
-									 <tr data-search-text="<?= htmlspecialchars($searchText) ?>">
+									 <tr data-search-text="<?= htmlspecialchars($searchText) ?>"<?php if (!empty($yearValuesAttr)) { ?> data-year-values="<?= $yearValuesAttr ?>"<?php } ?>>
 									<td><?=$key['num_fact']?></td>
 									<td><?=$key['nom_client']?></td>
 									 <td align="right">
