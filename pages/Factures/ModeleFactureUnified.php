@@ -375,13 +375,24 @@ html,body{ background:#f6f6f6; margin:0; color:#111; font-family:var(--font) }
     if ($nbAdresse == 0) {
       foreach ($ProjetsFacture as $projet) {
         $qte  = $projet['qte'] ?? '';
-        $pu   = ($qte !== 'ENS' && $qte!=='') ? ($projet['prix_unit_htv'] ?? '') : ($projet['prixForfitaire'] ?? '');
+        $prixUnit = $projet['prix_unit_htv'] ?? '';
+        $prixForfait = $projet['prixForfitaire'] ?? '';
+        $prixTTC = $projet['prixTTC'] ?? '';
+        $pu   = ($qte !== 'ENS' && $qte!=='') ? $prixUnit : $prixForfait;
         $pth  = null;
-        if (!empty($projet['prixForfitaire'])) $pth = (float)$projet['prixForfitaire'];
-        elseif ($qte!=='' && $qte!=='ENS' && !empty($projet['prix_unit_htv'])) $pth = (float)$qte * (float)$projet['prix_unit_htv'];
-        elseif (!empty($projet['prixTTC']) && is_numeric($projet['prixTTC'])) {
+        if ($prixForfait !== '') $pth = (float)$prixForfait;
+        elseif ($qte!=='' && $qte!=='ENS' && $prixUnit!=='') $pth = (float)$qte * (float)$prixUnit;
+        elseif ($prixTTC !== '') {
           $rate = $isExonore ? 0.0 : 0.19;
-          $pth = $rate > 0 ? ((float)$projet['prixTTC'] / (1.0 + $rate)) : (float)$projet['prixTTC'];
+          $pth = $rate > 0 ? ((float)$prixTTC / (1.0 + $rate)) : (float)$prixTTC;
+        }
+        // If PU is missing but TTC is present, derive PU HT from TTC / QTE (or TTC if no QTE)
+        if (($pu === '' || $pu === null) && $prixTTC !== '') {
+          $rate = $isExonore ? 0.0 : 0.19;
+          $baseHT = $rate > 0 ? ((float)$prixTTC / (1.0 + $rate)) : (float)$prixTTC;
+          $qty = (is_numeric($qte) && (float)$qte > 0) ? (float)$qte : 1.0;
+          $pu = $baseHT / $qty;
+          if (!is_numeric($pth)) { $pth = $baseHT; }
         }
         // Prefer aliased names from LEFT JOIN; fallback to legacy keys
         $desc = $projet['projet_classement'] ?? ($projet['classement'] ?? ($projet['projet_designation'] ?? ($projet['designation'] ?? '')));
@@ -406,11 +417,21 @@ html,body{ background:#f6f6f6; margin:0; color:#111; font-family:var(--font) }
         foreach ($ProjetsFacture as $projet) {
           if (($projet['adresseClient'] ?? '') === $label) {
             $qte  = $projet['qte'] ?? '';
-            $pu   = $projet['prixForfitaire'] ?? ($projet['prix_unit_htv'] ?? '');
-            $pth  = $projet['prixForfitaire'] ?? (($projet['qte'] ?? 0) * ($projet['prix_unit_htv'] ?? 0));
-            if ((!isset($pth) || $pth === '' || !is_numeric($pth)) && !empty($projet['prixTTC']) && is_numeric($projet['prixTTC'])) {
+            $prixUnit = $projet['prix_unit_htv'] ?? '';
+            $prixForfait = $projet['prixForfitaire'] ?? '';
+            $prixTTC = $projet['prixTTC'] ?? '';
+            $pu   = $prixForfait !== '' ? $prixForfait : $prixUnit;
+            $pth  = $prixForfait !== '' ? $prixForfait : (($projet['qte'] ?? 0) * ($prixUnit !== '' ? $prixUnit : 0));
+            if ((!isset($pth) || $pth === '' || !is_numeric($pth)) && $prixTTC !== '') {
               $rate = $isExonore ? 0.0 : 0.19;
-              $pth = $rate > 0 ? ((float)$projet['prixTTC'] / (1.0 + $rate)) : (float)$projet['prixTTC'];
+              $pth = $rate > 0 ? ((float)$prixTTC / (1.0 + $rate)) : (float)$prixTTC;
+            }
+            if (($pu === '' || $pu === null) && $prixTTC !== '') {
+              $rate = $isExonore ? 0.0 : 0.19;
+              $baseHT = $rate > 0 ? ((float)$prixTTC / (1.0 + $rate)) : (float)$prixTTC;
+              $qty = (is_numeric($qte) && (float)$qte > 0) ? (float)$qte : 1.0;
+              $pu = $baseHT / $qty;
+              if (!is_numeric($pth)) { $pth = $baseHT; }
             }
             $desc = $projet['projet_classement'] ?? ($projet['classement'] ?? ($projet['projet_designation'] ?? ($projet['designation'] ?? '')));
             if ($desc === '' && isset($projet['projet'])) { $desc = 'Projet '.(string)$projet['projet']; }
@@ -433,13 +454,23 @@ html,body{ background:#f6f6f6; margin:0; color:#111; font-family:var(--font) }
     if (!$printedAny) {
       foreach ($ProjetsFacture as $projet) {
         $qte  = $projet['qte'] ?? '';
-        $pu   = ($qte !== 'ENS' && $qte!=='') ? ($projet['prix_unit_htv'] ?? '') : ($projet['prixForfitaire'] ?? '');
+        $prixUnit = $projet['prix_unit_htv'] ?? '';
+        $prixForfait = $projet['prixForfitaire'] ?? '';
+        $prixTTC = $projet['prixTTC'] ?? '';
+        $pu   = ($qte !== 'ENS' && $qte!=='') ? $prixUnit : $prixForfait;
         $pth  = null;
-        if (!empty($projet['prixForfitaire'])) $pth = (float)$projet['prixForfitaire'];
-        elseif ($qte!=='' && $qte!=='ENS' && !empty($projet['prix_unit_htv'])) $pth = (float)$qte * (float)$projet['prix_unit_htv'];
-        elseif (!empty($projet['prixTTC']) && is_numeric($projet['prixTTC'])) {
+        if (!empty($prixForfait)) $pth = (float)$prixForfait;
+        elseif ($qte!=='' && $qte!=='ENS' && $prixUnit!=='') $pth = (float)$qte * (float)$prixUnit;
+        elseif ($prixTTC !== '') {
           $rate = $isExonore ? 0.0 : 0.19;
-          $pth = $rate > 0 ? ((float)$projet['prixTTC'] / (1.0 + $rate)) : (float)$projet['prixTTC'];
+          $pth = $rate > 0 ? ((float)$prixTTC / (1.0 + $rate)) : (float)$prixTTC;
+        }
+        if (($pu === '' || $pu === null) && $prixTTC !== '') {
+          $rate = $isExonore ? 0.0 : 0.19;
+          $baseHT = $rate > 0 ? ((float)$prixTTC / (1.0 + $rate)) : (float)$prixTTC;
+          $qty = (is_numeric($qte) && (float)$qte > 0) ? (float)$qte : 1.0;
+          $pu = $baseHT / $qty;
+          if (!is_numeric($pth)) { $pth = $baseHT; }
         }
         $desc = $projet['projet_classement'] ?? ($projet['classement'] ?? ($projet['projet_designation'] ?? ($projet['designation'] ?? '')));
         if ($desc === '' && isset($projet['projet'])) { $desc = 'Projet '.(string)$projet['projet']; }
