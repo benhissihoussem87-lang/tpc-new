@@ -209,7 +209,8 @@
       var options = {};
       if (addExtras) {
         options.dom = domLayout;
-        options.searching = false;
+        // Keep searching enabled; we wire custom controls to the DataTables API.
+        options.searching = true;
       }
       var orderColAttr = $table.attr('data-order-column');
       if (typeof orderColAttr !== 'undefined') {
