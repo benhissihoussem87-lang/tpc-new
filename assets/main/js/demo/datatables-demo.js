@@ -124,11 +124,7 @@
       // Apply via DataTables if present
       if (dtInstance && typeof dtInstance.search === 'function') {
         dtInstance.search(term || '');
-        if (yearSelect && yearVal) {
-          dtInstance.column(parseInt($table.attr('data-year-column') || 0, 10) || 0).search(yearVal, false, false);
-        } else if (yearSelect) {
-          dtInstance.column(parseInt($table.attr('data-year-column') || 0, 10) || 0).search('');
-        }
+        // Do not constrain by column here; let the manual fallback below handle year filtering consistently.
         dtInstance.draw();
       }
 
