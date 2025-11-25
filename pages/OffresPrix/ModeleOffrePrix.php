@@ -67,14 +67,33 @@ if (!function_exists('tnd_amount_in_words')) {
 
 // ---- Build rows (server) ----
 $rows = !empty($ProjetsOffre) ? $ProjetsOffre : (!empty($Projets) ? $Projets : []);
+$numOffrePrint = $_GET['offre'] ?? '';
+// Final fallback: fetch directly from facture_projets if still empty
+if (empty($rows) && $numOffrePrint !== '') {
+  require_once '../../class/connexion.db.php';
+  $pdo = connexion();
+  $stmt = $pdo->prepare("
+    SELECT fp.*, p.classement, p.id AS projet_id
+    FROM facture_projets AS fp
+    LEFT JOIN projet AS p ON fp.projet = p.id
+    WHERE fp.facture = :num
+  ");
+  $stmt->execute([':num' => $numOffrePrint]);
+  $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+  if (empty($adressesClient)) {
+    $stAddr = $pdo->prepare("SELECT DISTINCT(adresseClient) AS adresseClient FROM facture_projets WHERE facture = :num");
+    $stAddr->execute([':num' => $numOffrePrint]);
+    $adressesClient = $stAddr->fetchAll(PDO::FETCH_ASSOC);
+  }
+}
 $totalHT = 0.0;
 ob_start();
-if (!empty($adressesClient)) {
-  $addressLabels = [];
-  foreach ($adressesClient as $a) {
-    $label = is_array($a) ? ($a['adresseClient'] ?? ($a[0] ?? '')) : (string)$a;
-    if ($label !== '') $addressLabels[] = $label;
-  }
+$addressLabels = [];
+foreach ($adressesClient as $a) {
+  $label = is_array($a) ? ($a['adresseClient'] ?? ($a[0] ?? '')) : (string)$a;
+  if ($label !== '') $addressLabels[] = $label;
+}
+if (!empty($addressLabels)) {
   $groups = [];
   foreach ($rows as $r){
     $lab = $r['adresseClient'] ?? ($r['adresse'] ?? 'AUTRE');

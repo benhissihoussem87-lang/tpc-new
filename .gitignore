@@ -12,3 +12,6 @@ Thumbs.db
 .idea/
 .vscode/
 release/
+# Local database dumps/seeds (do not push)
+db/init/
+db/seed_*.sql

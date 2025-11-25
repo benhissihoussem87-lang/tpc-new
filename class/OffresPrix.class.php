@@ -166,6 +166,12 @@ public function detailOffreByNumOffre($idOffre){
 		$sql="SELECT distinct(adresseClient) FROM offres_projets as fP where  fP.offre='$offre' and fP.adresseClient!='' ";
 		$req=$this->cnx->query($sql);
 		$resultat=$req->fetchAll();
+		// Fallback if offres_projets is empty: look in facture_projets mirror.
+		if (empty($resultat)) {
+			$sql2 = "SELECT DISTINCT(adresseClient) FROM facture_projets WHERE facture = '$offre' AND adresseClient IS NOT NULL";
+			$req2 = $this->cnx->query($sql2);
+			$resultat = $req2->fetchAll();
+		}
 		return $resultat;
 	}
 	
@@ -173,14 +179,119 @@ public function get_All_AdressesClient_ProjetsByOffre($offre){
 		 $sql="SELECT distinct(adresseClient) FROM offres_projets where  offre='$offre'  ";
 		$req=$this->cnx->query($sql);
 		$resultat=$req->fetchAll();
+		if (empty($resultat)) {
+			$sql2 = "SELECT DISTINCT(adresseClient) FROM facture_projets WHERE facture = '$offre'";
+			$req2 = $this->cnx->query($sql2);
+			$resultat = $req2->fetchAll();
+		}
 		return $resultat;
 	}
 /******** Afficher les projets de l'offre selectionner***********/
-public function get_AllProjets_ByOffre($offre){
-		 $sql="SELECT * FROM offres_projets as fP,projet as p where  fP.offre='$offre' and fP.projet=p.id";
-		$req=$this->cnx->query($sql);
-		$resultat=$req->fetchAll();
-		return $resultat;
+	public function get_AllProjets_ByOffre($offre, $offreId = null){
+		$offre = (string)$offre;
+		$offreNorm    = preg_replace('/\s+/', '', $offre);
+		$offreNoSlash = str_replace('/', '', $offreNorm);
+		$offreIdInt   = (is_numeric($offreId)) ? (int)$offreId : null;
+		$offreLike    = '%'.$offre.'%';
+
+		$conds = [];
+		$params = [];
+
+		// Base variants on the raw num_offre
+		$conds[] = "fP.offre = ?";
+		$params[] = $offre;
+
+		$conds[] = "TRIM(fP.offre) = TRIM(?)";
+		$params[] = $offre;
+
+		$conds[] = "REPLACE(TRIM(fP.offre), ' ', '') = ?";
+		$params[] = $offreNorm;
+
+		$conds[] = "REPLACE(REPLACE(TRIM(fP.offre), ' ', ''), '/', '') = ?";
+		$params[] = $offreNoSlash;
+
+		$conds[] = "fP.offre LIKE ?";
+		$params[] = $offreLike;
+
+		// Variants based on id_offre if provided
+		if ($offreIdInt !== null) {
+			$conds[] = "fP.offre = ?";
+			$params[] = (string)$offreIdInt;
+
+			$conds[] = "op.id_offre = ?";
+			$params[] = $offreIdInt;
+
+			$conds[] = "op.num_offre = ?";
+			$params[] = $offre;
+
+			$conds[] = "TRIM(op.num_offre) = TRIM(?)";
+			$params[] = $offre;
+
+			$conds[] = "REPLACE(TRIM(op.num_offre), ' ', '') = ?";
+			$params[] = $offreNorm;
+
+			$conds[] = "REPLACE(REPLACE(TRIM(op.num_offre), ' ', ''), '/', '') = ?";
+			$params[] = $offreNoSlash;
+
+			$conds[] = "op.num_offre LIKE ?";
+			$params[] = $offreLike;
+		}
+
+		$sql = "
+			SELECT fP.*,
+			       p.id   AS projet_id,
+			       p.classement
+			FROM offres_projets AS fP
+			LEFT JOIN projet AS p ON fP.projet = p.id
+			LEFT JOIN offre_prix AS op ON fP.offre = op.num_offre
+			WHERE ".implode(' OR ', $conds)."
+		";
+		$st = $this->cnx->prepare($sql);
+		$st->execute($params);
+		$rows = $st->fetchAll();
+
+		// Fallback: if nothing matched (unusual formatting), try a broad LIKE scan without joins.
+		if (empty($rows)) {
+			$likeNum    = '%'.$offre.'%';
+			$likeNorm   = '%'.$offreNorm.'%';
+			$likeNoSlash= '%'.$offreNoSlash.'%';
+			$likeIdStr  = ($offreIdInt !== null) ? '%'.$offreIdInt.'%' : null;
+
+			$fallbackConds = [
+				"offre LIKE ?",
+				"REPLACE(offre, ' ', '') LIKE ?",
+				"REPLACE(REPLACE(offre, ' ', ''), '/', '') LIKE ?"
+			];
+			$fallbackParams = [$likeNum, $likeNorm, $likeNoSlash];
+
+			if ($likeIdStr !== null) {
+				$fallbackConds[] = "offre LIKE ?";
+				$fallbackParams[] = $likeIdStr;
+			}
+
+			$fallbackSql = "
+				SELECT *, projet AS projet_id
+				FROM offres_projets
+				WHERE ".implode(' OR ', $fallbackConds)."
+			";
+			$fallbackStmt = $this->cnx->prepare($fallbackSql);
+			$fallbackStmt->execute($fallbackParams);
+			$rows = $fallbackStmt->fetchAll();
+		}
+
+		// Final fallback: many legacy offers only have lines in facture_projets (mirrored during creation).
+		if (empty($rows)) {
+			$fallback = $this->cnx->prepare("
+				SELECT fp.*, p.classement, p.id AS projet_id
+				FROM facture_projets AS fp
+				LEFT JOIN projet AS p ON fp.projet = p.id
+				WHERE fp.facture = :f OR TRIM(fp.facture) = TRIM(:f2)
+			");
+			$fallback->execute([':f' => $offre, ':f2' => $offre]);
+			$rows = $fallback->fetchAll();
+		}
+
+		return $rows;
 	}
 // Delete All Projet By Offre 
 
@@ -194,45 +305,109 @@ public function get_AllProjets_ByOffre($offre){
 	}	
 /************ delete Offre By Num Offre et Adresse ***********/
 public function delete_All_Projets_By_OffreAndAdresse($offre,$adresse){
-		// delete Offres_Projet by numFacture
-		 $sql="delete from offres_projets where offre='$offre' and adresseClient='$adresse'";
-		
-		 $result=$this->cnx->exec($sql);
-		 if($result)return true;
-		 else return false;
+		$offre = (string)$offre;
+		$adr   = isset($adresse) ? trim((string)$adresse) : '';
+
+		if ($adr === '') {
+			$sql = "DELETE FROM offres_projets WHERE offre = :offre AND (adresseClient IS NULL OR adresseClient = '')";
+			$params = [':offre' => $offre];
+		} else {
+			$sql = "DELETE FROM offres_projets WHERE offre = :offre AND adresseClient = :adr";
+			$params = [':offre' => $offre, ':adr' => $adr];
+		}
+
+		$st = $this->cnx->prepare($sql);
+		return $st->execute($params);
 	}
 public function getAdresseOffreProjetByOffre($offre){
-		  $sql="SELECT distinct(adresseClient) FROM offres_projets  where offre='$offre'";
+		$offre = (string)$offre;
+		$sql="SELECT distinct(adresseClient) FROM offres_projets  where offre='$offre'";
 		$req=$this->cnx->query($sql);
 		$resultat=$req->fetchAll();
-	
+		// Legacy rows may exist only in facture_projets; surface those addresses too
+		if (empty($resultat)) {
+			$sql2 = "SELECT DISTINCT(adresseClient) FROM facture_projets WHERE facture = :offre";
+			$st2  = $this->cnx->prepare($sql2);
+			$st2->execute([':offre' => $offre]);
+			$resultat = $st2->fetchAll();
+		}
 		return $resultat;
 	}
 
 /************ Modifier Adresse Offre ***************/
 public function ModifierAdresseOffre($adresse,$nouveauAdresse,$offre){
-		
-		 $sql="update offres_projets set `adresseClient`='$nouveauAdresse' where adresseClient='$adresse' and offre='$offre'";
-		 $result=$this->cnx->exec($sql);
-		 if($result)return true;
-		 else return false;
-		
+		$offre = (string)$offre;
+		$old   = isset($adresse) ? trim((string)$adresse) : '';
+		$new   = isset($nouveauAdresse) ? trim((string)$nouveauAdresse) : '';
+		$new   = ($new === '') ? null : $new;
+
+		if ($old === '') {
+			$sql = "UPDATE offres_projets
+					SET adresseClient = :new
+					WHERE offre = :offre AND (adresseClient IS NULL OR adresseClient = '')";
+			$sqlFact = "UPDATE facture_projets
+					SET adresseClient = :new
+					WHERE facture = :offre AND (adresseClient IS NULL OR adresseClient = '')";
+			$params = [':new' => $new, ':offre' => $offre];
+		} else {
+			$sql = "UPDATE offres_projets
+					SET adresseClient = :new
+					WHERE offre = :offre AND adresseClient = :old";
+			$sqlFact = "UPDATE facture_projets
+					SET adresseClient = :new
+					WHERE facture = :offre AND adresseClient = :old";
+			$params = [':new' => $new, ':offre' => $offre, ':old' => $old];
+		}
+
+		$st = $this->cnx->prepare($sql);
+		$ok1 = $st->execute($params);
+
+		// Mirror update in facture_projets to keep address consistent when offres_projets is empty.
+		$st2 = $this->cnx->prepare($sqlFact);
+		$ok2 = $st2->execute($params);
+
+		return $ok1 || $ok2;
 	}
 // Delete Offre By Adresse 
 
 	public function deleteOffreByAdresse($offre,$adresse){
-		  $sql="delete from offres_projets where offre ='$offre' and adresseClient='$adresse'";
-		 $result=$this->cnx->exec($sql);
-		 if($result)return true;
-		 else return false;
-		
+		$offre = (string)$offre;
+		$adr   = isset($adresse) ? trim((string)$adresse) : '';
+
+		if ($adr === '') {
+			$sql = "DELETE FROM offres_projets WHERE offre = :offre AND (adresseClient IS NULL OR adresseClient = '')";
+			$sqlFact = "DELETE FROM facture_projets WHERE facture = :offre AND (adresseClient IS NULL OR adresseClient = '')";
+			$params = [':offre' => $offre];
+		} else {
+			$sql = "DELETE FROM offres_projets WHERE offre = :offre AND adresseClient = :adr";
+			$sqlFact = "DELETE FROM facture_projets WHERE facture = :offre AND adresseClient = :adr";
+			$params = [':offre' => $offre, ':adr' => $adr];
+		}
+
+		$st = $this->cnx->prepare($sql);
+		$ok1 = $st->execute($params);
+
+		$st2 = $this->cnx->prepare($sqlFact);
+		$ok2 = $st2->execute($params);
+
+		return $ok1 || $ok2;
 	}	
 /************ verification existance offre & adresse  ********************/	
 public function VerifOffredansFacturesProjet($offre,$adresse){
- $sql="SELECT * FROM offres_projets  where offre='$offre' and adresseClient='$adresse'";
-		$req=$this->cnx->query($sql);
-		$resultat=$req->fetch();
-	    return $resultat;
+		$offre = (string)$offre;
+		$adr   = isset($adresse) ? trim((string)$adresse) : '';
+
+		if ($adr === '') {
+			$sql = "SELECT 1 FROM offres_projets WHERE offre = :offre AND (adresseClient IS NULL OR adresseClient = '') LIMIT 1";
+			$params = [':offre' => $offre];
+		} else {
+			$sql = "SELECT 1 FROM offres_projets WHERE offre = :offre AND adresseClient = :adr LIMIT 1";
+			$params = [':offre' => $offre, ':adr' => $adr];
+		}
+
+		$st = $this->cnx->prepare($sql);
+		$st->execute($params);
+	    return $st->fetch();
 	}
 }
 $offre=new OffresPrix();

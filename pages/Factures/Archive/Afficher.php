@@ -134,7 +134,7 @@ if ($selectedYear !== '') {
       </div>
     </div>
     <div class="table-responsive">
-      <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0" data-year-filter="#archiveFacturesYearFilter" data-year-column="1">
+      <table class="table table-bordered dt-extra-controls" id="dataTable" width="100%" cellspacing="0" data-year-filter="#archiveFacturesYearFilter" data-year-column="1">
         <thead>
           <tr>
             <th>Num Facture</th>

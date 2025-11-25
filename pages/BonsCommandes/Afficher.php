@@ -18,17 +18,8 @@ $BonsCommandes=$bonCommande->getAll();
 							</div>
                         
                          <div class="card-body">
-							<div class="row mb-3">
-								<div class="col-md-4">
-									<label for="bonsSearch" class="form-label">Recherche rapide</label>
-									<input type="search" class="form-control" id="bonsSearch" placeholder="Num BC, client...">
-								</div>
-								<div class="col-md-2 d-flex align-items-end">
-									<button type="button" class="btn btn-secondary w-100" id="bonsApply">Filtrer</button>
-								</div>
-							</div>
                             <div class="table-responsive">
-                                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                                <table class="table table-bordered dt-extra-controls" id="dataTable" width="100%" cellspacing="0" data-year-column="1">
                                     <thead>
                                         <tr> 
 										    <th  >N° Bon Commande Facture</th>
@@ -84,22 +75,4 @@ $BonsCommandes=$bonCommande->getAll();
                                 </table>
                             </div>
                         </div>
-                    </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function(){
-  var table = document.getElementById('dataTable');
-  var search = document.getElementById('bonsSearch');
-  var btn = document.getElementById('bonsApply');
-  function apply(){
-    if(!table) return;
-    var term = search ? (search.value || '').toLowerCase() : '';
-    table.querySelectorAll('tbody tr').forEach(function(tr){
-      var txt = (tr.innerText || '').toLowerCase();
-      tr.style.display = term ? (txt.indexOf(term) !== -1 ? '' : 'none') : '';
-    });
-  }
-  if (search) search.addEventListener('input', apply);
-  if (btn) btn.addEventListener('click', apply);
-});
-</script>
+</div>

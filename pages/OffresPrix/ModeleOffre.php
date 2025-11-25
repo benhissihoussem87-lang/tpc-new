@@ -1,17 +1,38 @@
 <?php
+include_once '../../class/connexion.db.php';
 include_once '../../class/OffresPrix.class.php';
 include_once '../../class/Factures.class.php';
 $infosOffre=$offre->detailOffreByNumOffre($_GET['offre']);
-$ProjetsOffre=$offre->get_AllProjets_ByOffre($_GET['offre']);
-//Get Adresse Client By Facture Offre
-$Projets=$facture->get_AllProjets_ByFacture($_GET['offre']);
-$adressesClient=$facture->get_All_AdressesClient_ProjetsFacture($_GET['offre']);
+$offreId = isset($infosOffre['id_offre']) ? $infosOffre['id_offre'] : null;
+$ProjetsOffre=$offre->get_AllProjets_ByOffre($_GET['offre'], $offreId);
+// Use the same loader (falls back to facture_projets) for print
+$Projets=$ProjetsOffre;
+$adressesClient=$offre->get_All_AdressesClient_ProjetsByOffre($_GET['offre']);
 
 /**** Adresses Offres *********/
 if(empty($adressesClient)){
 	$adressesClient=$offre->get_All_AdressesClient_ProjetsByOffre($_GET['offre']);
 }
 $nbAdresse=count($adressesClient);
+
+// Final print-specific fallback: if still no lines, read from facture_projets directly
+if (empty($ProjetsOffre)) {
+  $pdo = connexion();
+  $st = $pdo->prepare("
+    SELECT fp.*, p.classement, p.id AS projet_id
+    FROM facture_projets AS fp
+    LEFT JOIN projet AS p ON fp.projet = p.id
+    WHERE fp.facture = :num
+  ");
+  $st->execute([':num' => $_GET['offre']]);
+  $ProjetsOffre = $st->fetchAll(PDO::FETCH_ASSOC);
+  $Projets = $ProjetsOffre;
+  if (empty($adressesClient)) {
+    $st2 = $pdo->prepare("SELECT DISTINCT(adresseClient) AS adresseClient FROM facture_projets WHERE facture = :num");
+    $st2->execute([':num' => $_GET['offre']]);
+    $adressesClient = $st2->fetchAll(PDO::FETCH_ASSOC);
+  }
+}
 // Verification si l'offre est forfitaire ou non 
 $verifForfitaireOffre=null;
 if(!empty($ProjetsOffre)){foreach($ProjetsOffre as $projet){
@@ -23,18 +44,10 @@ if(!empty($ProjetsOffre)){foreach($ProjetsOffre as $projet){
 
 //echo '<h1>NB Adresse '.$nbAdresse.'</h1>';
 if(!empty($Projets)){foreach($Projets as $p){
-	
 	if($p['adresseClient']!=''){$verifMultiAdresseFacture='oui';}
 	else {$verifMultiAdresseFacture='non';}
 }}
-else {
-	$Projets=$offre->get_AllProjets_ByOffre($_GET['offre']);
-	if(!empty($Projets)){foreach($Projets as $p){
-	
-	if($p['adresseClient']!=''){$verifMultiAdresseFacture='oui';}
-	else {$verifMultiAdresseFacture='non';}
-}}
-}
+// No else; Projets already set to loader result
 
 //echo '<h1 style="text-align:center"> Etat Facture '.$verifMultiAdresseFacture.'</h1>';
 @$dates=explode('-',$infosOffre['date']);

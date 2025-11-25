@@ -40,17 +40,8 @@ else {echo "<script>alert('Erreur !!! ')</script>";}
 							</div>
                         
                          <div class="card-body">
-							<div class="row mb-3">
-								<div class="col-md-4">
-									<label for="bordereauxSearch" class="form-label">Recherche rapide</label>
-									<input type="search" class="form-control" id="bordereauxSearch" placeholder="Num bordereau, facture, client...">
-								</div>
-								<div class="col-md-2 d-flex align-items-end">
-									<button type="button" class="btn btn-secondary w-100" id="bordereauxApply">Filtrer</button>
-								</div>
-							</div>
                             <div class="table-responsive">
-                                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                                <table class="table table-bordered dt-extra-controls" id="dataTable" width="100%" cellspacing="0" data-year-column="1">
                                     <thead>
                                         <tr> 
 										    <th >Numéro Bordereau</th>
@@ -173,22 +164,4 @@ else {echo "<script>alert('Erreur !!! ')</script>";}
                                 </table>
                             </div>
                         </div>
-                    </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function(){
-  var table = document.getElementById('dataTable');
-  var search = document.getElementById('bordereauxSearch');
-  var btn = document.getElementById('bordereauxApply');
-  function apply(){
-    if(!table) return;
-    var term = search ? (search.value || '').toLowerCase() : '';
-    table.querySelectorAll('tbody tr').forEach(function(tr){
-      var txt = (tr.innerText || '').toLowerCase();
-      tr.style.display = term ? (txt.indexOf(term) !== -1 ? '' : 'none') : '';
-    });
-  }
-  if (search) search.addEventListener('input', apply);
-  if (btn) btn.addEventListener('click', apply);
-});
-</script>
+</div>

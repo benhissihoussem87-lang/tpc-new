@@ -206,7 +206,7 @@ document.addEventListener('DOMContentLoaded', function(){
                                 </div>
                             </div>
                             <div class="table-responsive">
-                                <table class="table table-bordered" id="dataTable" width="90%" cellspacing="0">
+                                <table class="table table-bordered dt-extra-controls" id="dataTable" width="90%" cellspacing="0" data-year-column="1">
                                     <thead>
                                         <tr>
 											<th >Code</th>

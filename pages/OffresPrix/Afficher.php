@@ -132,13 +132,42 @@ document.addEventListener('DOMContentLoaded', function(){
 	const table = document.getElementById('dataTable');
 	const yearSel = document.getElementById('offreYearFilter');
 	const btn = document.getElementById('offreYearApply');
+	let dt = null;
+
+	if (window.jQuery && $.fn && $.fn.DataTable) {
+		if ($.fn.DataTable.isDataTable('#dataTable')) {
+			dt = $('#dataTable').DataTable();
+		} else {
+			dt = $('#dataTable').DataTable();
+		}
+	}
+
+	function normalize(str){
+		return (str || '')
+			.toLowerCase()
+			.normalize('NFD').replace(/[\u0300-\u036f]/g,'') // strip accents
+			.replace(/\s+/g,' ')
+			.trim();
+	}
 
 	function applyFilter(){
 		if (!table) return;
-		const term = search ? (search.value || '').toLowerCase() : '';
+		const term = search ? normalize(search.value || '') : '';
 		const year = yearSel ? yearSel.value : '';
+		if (dt) {
+			dt.search(term || '');
+			if (year) {
+				dt.column(1).search(year, false, false);
+			} else {
+				dt.column(1).search('');
+			}
+			dt.draw();
+			return;
+		}
+		// manual fallback if DataTables is unavailable
 		table.querySelectorAll('tbody tr').forEach(function(tr){
-			const txt = (tr.innerText || '').toLowerCase();
+			const attrTxt = tr.getAttribute('data-search-text') || '';
+			const txt = normalize(attrTxt || tr.innerText || '');
 			const matchesTerm = term ? txt.indexOf(term) !== -1 : true;
 			let matchesYear = true;
 			if (year) {
@@ -155,8 +184,24 @@ document.addEventListener('DOMContentLoaded', function(){
 	if (btn) btn.addEventListener('click', applyFilter);
 
 	applyFilter();
+
+	// Hide any DataTables-injected search/filter controls (we use the custom ones above)
+	const dtFilters = document.querySelectorAll('#dataTable_wrapper .dataTables_filter');
+	dtFilters.forEach(el => { el.style.display = 'none'; });
+	const extraControls = document.querySelectorAll('.dt-extra-controls');
+	extraControls.forEach(el => el.parentNode && el.parentNode.removeChild(el));
+	const dtLengths = document.querySelectorAll('#dataTable_wrapper .dataTables_length');
+	dtLengths.forEach(el => { el.style.display = 'none'; });
 });
 </script>
+<style>
+  /* Hide any DataTables auto-inserted controls on this page */
+  #dataTable_wrapper .dataTables_filter,
+  #dataTable_wrapper .dataTables_length,
+  #dataTable_wrapper .dt-extra-controls {
+    display: none !important;
+  }
+</style>
 <!--  Fin Modal Add Offre-->
 
  <!-- DataTales Example -->
@@ -189,7 +234,7 @@ document.addEventListener('DOMContentLoaded', function(){
 								</div>
 							</div>
                             <div class="table-responsive">
-                                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0" data-year-filter="#offreYearFilter" data-year-column="1">
+                                <table class="table table-bordered no-dt-controls" id="dataTable" width="100%" cellspacing="0" data-year-filter="#offreYearFilter" data-year-column="1">
                                     <thead>
                                          <tr>
                                             <th>Num Offre</th>
@@ -205,7 +250,7 @@ document.addEventListener('DOMContentLoaded', function(){
 									<?php if(!empty($offres)){
 										foreach($offres as $key){
 						/********************/
- $ProjetsOffre=$offre->get_AllProjets_ByOffre($key['num_offre']);
+ $ProjetsOffre=$offre->get_AllProjets_ByOffre($key['num_offre'], $key['id_offre']);
  
  // Verification si l'offre est forfitaire ou non 
  $verifForfitaireOffre=null;
@@ -214,6 +259,10 @@ document.addEventListener('DOMContentLoaded', function(){
  	else if($projet['prix_unit_htv']!=''){$verifForfitaireOffre='Nonforfitaire'; break;}
  	
  }}
+ $modifUrl = "?Offres_Prix&modifier={$key['num_offre']}&idoffre={$key['id_offre']}";
+ if ($verifForfitaireOffre === 'forfitaire') {
+	$modifUrl = "?Offres_Prix&modifierOffreForfitaire={$key['num_offre']}&idoffre={$key['id_offre']}";
+ }
  $yearValue = '';
  if (!empty($key['date'])) {
 	$maybeYear = substr((string)$key['date'], 0, 4);
@@ -232,12 +281,7 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
      
       <div class="modal-footer">
-	  <?php if($verifForfitaireOffre=='Nonforfitaire'){?>
-         <a href="?Offres_Prix&modifier=<?=$key['num_offre']?>&idoffre=<?=$key['id_offre']?>" class="btn btn-warning">Modifier Offre</a>
-	  <?php } else if($verifForfitaireOffre=='forfitaire'){?>
-	   <a href="?Offres_Prix&modifierOffreForfitaire=<?=$key['num_offre']?>&idoffre=<?=$key['id_offre']?>" class="btn btn-warning">Modifier Offre</a>
-	  
-	  <?php }?>
+         <a href="<?=$modifUrl?>" class="btn btn-warning">Modifier Offre</a>
 		 <a href="#" class="btn btn-primary"  data-bs-toggle="modal" data-bs-target="#ModalUpdateAdresse<?=$key['num_offre']?>"   data-bs-dismiss="modal">Modifier Adresse</a>
       </div>
     </div>
@@ -270,7 +314,9 @@ document.addEventListener('DOMContentLoaded', function(){
 				   echo 'Adresse Vide ';
 				  }?>
 				 </option>
-				 <?php }} ?>				 
+				 <?php }} else { ?>
+				 <option value="">Adresse Vide</option>
+				 <?php } ?>				 
 										
 				</select>
 				   
@@ -340,7 +386,9 @@ document.addEventListener('DOMContentLoaded', function(){
 				   echo 'Adresse Vide ';
 				  }?>
 				 </option>
-				 <?php }} ?>				 
+				 <?php }} else { ?>
+				 <option value="">Adresse Vide</option>
+				 <?php } ?>				 
 										
 				</select>
 				   
@@ -363,7 +411,10 @@ document.addEventListener('DOMContentLoaded', function(){
 													if (preg_match('/^\d{4}$/', $maybeYear)) { $yearValue = $maybeYear; }
 												}
 											?>
-											 <tr<?php if ($yearValue !== '') { ?> data-year-values="<?= htmlspecialchars($yearValue) ?>"<?php } ?>>
+<?php
+  $searchText = strtolower(trim($key['num_offre'].' '.$key['date'].' '.$key['nom_client']));
+?>
+											 <tr<?php if ($yearValue !== '') { ?> data-year-values="<?= htmlspecialchars($yearValue) ?>"<?php } ?> data-search-text="<?= htmlspecialchars($searchText) ?>">
 												<td><a href="#">
 												  <?=$key['num_offre']?>
 												  </a>

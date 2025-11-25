@@ -203,7 +203,12 @@
   function initTables() {
     $('table#dataTable').each(function() {
       var $table = $(this);
-      var options = { dom: domLayout };
+      var addExtras = $table.hasClass('dt-extra-controls');
+      var options = {};
+      if (addExtras) {
+        options.dom = domLayout;
+        options.searching = false;
+      }
       var orderColAttr = $table.attr('data-order-column');
       if (typeof orderColAttr !== 'undefined') {
         var orderDir = $table.attr('data-order-direction') || 'desc';
@@ -216,8 +221,10 @@
         }
         dt = $table.DataTable(options);
       }
-      buildControlsAndBind($table, dt);
-      bindYearFilter($table, dt);
+      if (addExtras) {
+        buildControlsAndBind($table, dt);
+        bindYearFilter($table, dt);
+      }
     });
   }
 

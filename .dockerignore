@@ -1,0 +1,8 @@
+.git
+node_modules
+vendor
+*.log
+*.tmp
+Dockerfile
+docker-compose.yml
+
