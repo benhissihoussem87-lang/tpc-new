@@ -117,6 +117,8 @@
 
     var runFilter = function() {
       var term = (input.value || '').toLowerCase();
+      // Normalize common separators so "31-2024" matches "31/2024"
+      term = term.replace(/-/g, '/');
       var yearVal = yearSelect ? yearSelect.value : '';
       if (dtInstance && typeof dtInstance.search === 'function') {
         dtInstance.search(term || '').draw();

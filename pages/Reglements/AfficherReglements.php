@@ -10,15 +10,6 @@ $Reglements=$reglement->getAll();
                        
                         
                         <div class="card-body">
-							<div class="row mb-3">
-								<div class="col-md-4">
-									<label for="reglementsSearch" class="form-label">Recherche rapide</label>
-									<input type="search" class="form-control" id="reglementsSearch" placeholder="Facture, client...">
-								</div>
-								<div class="col-md-2 d-flex align-items-end">
-									<button type="button" class="btn btn-secondary w-100" id="reglementsApply">Filtrer</button>
-								</div>
-							</div>
                             <div class="table-responsive">
                                 <table class="table table-bordered dt-extra-controls" id="dataTable" width="100%" cellspacing="0" data-year-column="2">
                                     <thead>
@@ -35,7 +26,7 @@ $Reglements=$reglement->getAll();
 											<th >Piece Retenue</th>
 											<th>Ajouter</th>
 											<th >Modifier</th>
-										</tr>
+                                        </tr>
                                     </thead>
                                     <tbody>
 									 <?php if(!empty($Reglements)){
@@ -125,21 +116,3 @@ $Reglements=$reglement->getAll();
                             </div>
                         </div>
                     </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function(){
-  var table = document.getElementById('dataTable');
-  var search = document.getElementById('reglementsSearch');
-  var btn = document.getElementById('reglementsApply');
-  function apply(){
-    if(!table) return;
-    var term = search ? (search.value || '').toLowerCase() : '';
-    table.querySelectorAll('tbody tr').forEach(function(tr){
-      var txt = (tr.innerText || '').toLowerCase();
-      tr.style.display = term ? (txt.indexOf(term) !== -1 ? '' : 'none') : '';
-    });
-  }
-  if (search) search.addEventListener('input', apply);
-  if (btn) btn.addEventListener('click', apply);
-});
-</script>
