@@ -6,6 +6,18 @@ include 'class/Factures.class.php';
 $clients=$clt->getAllClients();
 $projets=$projet->getAllProjets();
 $factures=$facture->AfficherFactures();
+// Build year list for filter
+$factureYears = [];
+if (!empty($factures)) {
+    foreach ($factures as $row) {
+        $year = isset($row['date']) ? substr((string)$row['date'], 0, 4) : '';
+        if (preg_match('/^\d{4}$/', $year)) {
+            $factureYears[$year] = true;
+        }
+    }
+}
+$factureYears = array_keys($factureYears);
+rsort($factureYears, SORT_STRING);
 
 // Générer le numOffre
 $anne=date('Y');
@@ -42,6 +54,24 @@ $anne=date('Y');
 							</div>
                         
                         <div class="card-body">
+							<div class="row mb-3">
+								<div class="col-md-4">
+									<label for="facturesSearch" class="form-label">Recherche rapide</label>
+									<input type="search" id="facturesSearch" class="form-control" placeholder="Rechercher une facture, client, exonoration..." autocomplete="off">
+								</div>
+								<div class="col-md-3">
+									<label for="factureYearFilter" class="form-label">Filtrer par annǸe</label>
+									<select id="factureYearFilter" class="form-control">
+										<option value="">Toutes les annǸes</option>
+										<?php foreach ($factureYears as $y) { ?>
+											<option value="<?= htmlspecialchars($y) ?>"><?= htmlspecialchars($y) ?></option>
+										<?php } ?>
+									</select>
+								</div>
+								<div class="col-md-2 d-flex align-items-end">
+									<button type="button" id="factureYearApply" class="btn btn-secondary w-100">Filtrer</button>
+								</div>
+							</div>
                             <div class="table-responsive">
                                 <table class="table table-bordered dt-extra-controls" id="dataTable" width="100%" cellspacing="0" data-year-column="1">
                                     <thead>
@@ -93,9 +123,84 @@ $anne=date('Y');
 	  
 	  <?php }?>
 		 <a href="#" class="btn btn-primary"  data-bs-toggle="modal" data-bs-target="#ModalUpdateAdresse<?=$key['num_fact']?>"   data-bs-dismiss="modal">Modifier Adresse</a>
-      </div>
-    </div>
-  </div>
+							</div>
+                        </div>
+                    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+	const search = document.getElementById('facturesSearch');
+	const table = document.getElementById('dataTable');
+	const yearSel = document.getElementById('factureYearFilter');
+	const btn = document.getElementById('factureYearApply');
+	let dt = null;
+
+	if (window.jQuery && $.fn && $.fn.DataTable) {
+		if ($.fn.DataTable.isDataTable('#dataTable')) {
+			dt = $('#dataTable').DataTable();
+		} else {
+			dt = $('#dataTable').DataTable();
+		}
+	}
+
+	function normalize(str){
+		return (str || '')
+			.toLowerCase()
+			.normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+			.replace(/\s+/g,' ')
+			.trim();
+	}
+
+	function applyFilter(){
+		if (!table) return;
+		const term = search ? normalize(search.value || '') : '';
+		const year = yearSel ? yearSel.value : '';
+		if (dt) {
+			dt.search(term || '');
+			if (year) {
+				dt.column(1).search(year, false, false);
+			} else {
+				dt.column(1).search('');
+			}
+			dt.draw();
+			return;
+		}
+		table.querySelectorAll('tbody tr').forEach(function(tr){
+			const attrTxt = tr.getAttribute('data-search-text') || '';
+			const txt = normalize(attrTxt || tr.innerText || '');
+			const matchesTerm = term ? txt.indexOf(term) !== -1 : true;
+			let matchesYear = true;
+			if (year) {
+				const attr = tr.getAttribute('data-year-values') || '';
+				const yearTxt = attr || txt;
+				matchesYear = yearTxt.indexOf(year) !== -1;
+			}
+			tr.style.display = (matchesTerm && matchesYear) ? '' : 'none';
+		});
+	}
+
+	if (search) search.addEventListener('input', applyFilter);
+	if (yearSel) yearSel.addEventListener('change', applyFilter);
+	if (btn) btn.addEventListener('click', applyFilter);
+
+	applyFilter();
+
+	// Hide DataTables default controls (we use custom ones)
+	const dtFilters = document.querySelectorAll('#dataTable_wrapper .dataTables_filter');
+	dtFilters.forEach(el => { el.style.display = 'none'; });
+	const extraControls = document.querySelectorAll('.dt-extra-controls');
+	extraControls.forEach(el => el.parentNode && el.parentNode.removeChild(el));
+	const dtLengths = document.querySelectorAll('#dataTable_wrapper .dataTables_length');
+	dtLengths.forEach(el => { el.style.display = 'none'; });
+});
+</script>
+<style>
+  #dataTable_wrapper .dataTables_filter,
+  #dataTable_wrapper .dataTables_length,
+  #dataTable_wrapper .dt-extra-controls {
+    display: none !important;
+  }
+</style>
 </div>
 <!-------- Modal Modifier Adresse Facture ---->
 <div class="modal fade"  id="ModalUpdateAdresse<?=$key['num_fact']?>" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
@@ -211,7 +316,15 @@ $anne=date('Y');
 </div>
 
 <!--------------- Fin Modal Supprimer Facture et Adresse Facture --------------->
-											 <tr>
+<?php
+  $yearValue = '';
+  if (!empty($key['date'])) {
+    $maybeYear = substr((string)$key['date'], 0, 4);
+    if (preg_match('/^\\d{4}$/', $maybeYear)) { $yearValue = $maybeYear; }
+  }
+  $searchText = strtolower(trim(($key['num_fact'] ?? '').' '.($key['date'] ?? '').' '.($key['nom_client'] ?? '').' '.($key['numexonoration'] ?? '').' '.($bonCommandeFacture['numboncommande'] ?? '')));
+?>
+											 <tr<?php if ($yearValue !== '') { ?> data-year-values="<?= htmlspecialchars($yearValue) ?>"<?php } ?> data-search-text="<?= htmlspecialchars($searchText) ?>">
 												<td>
 												<a href="?Factures&Projets=<?=$key['num_fact']?>" class="btn btn-success"><?=$key['num_fact']?></a>
 												</td>
