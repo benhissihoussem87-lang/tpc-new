@@ -80,8 +80,21 @@ document.addEventListener('DOMContentLoaded', function(){
   }
   if (search) search.addEventListener('input', apply);
   if (btn) btn.addEventListener('click', apply);
+
+  // Hide DataTables default search/length controls to avoid duplicate search bars
+  var dtFilters = document.querySelectorAll('#dataTable_wrapper .dataTables_filter');
+  dtFilters.forEach(function(el){ el.style.display = 'none'; });
+  var dtLengths = document.querySelectorAll('#dataTable_wrapper .dataTables_length');
+  dtLengths.forEach(function(el){ el.style.display = 'none'; });
 });
 </script>
+<style>
+  /* Hide DataTables auto-added search/length controls (we use the custom search above) */
+  #dataTable_wrapper .dataTables_filter,
+  #dataTable_wrapper .dataTables_length {
+    display: none !important;
+  }
+</style>
 <!--  Fin Modal Add Client-->
 
 		
