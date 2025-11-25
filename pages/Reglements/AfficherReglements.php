@@ -11,7 +11,7 @@ $Reglements=$reglement->getAll();
                         
                         <div class="card-body">
                             <div class="table-responsive">
-                                <table class="table table-bordered dt-extra-controls" id="dataTable" width="100%" cellspacing="0">
+                                <table class="table table-bordered dt-extra-controls" id="dataTable" width="100%" cellspacing="0" data-year-column="5">
                                     <thead>
                                         <tr> 
 										<th>Facture</th>
