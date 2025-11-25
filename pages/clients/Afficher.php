@@ -62,9 +62,26 @@ else {echo "<script>alert('Erreur !!! ')</script>";}
         
       </div>
 	  <div id="detail"></div>
-	  </div>
-  </div>
+		</div>
+	</div>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  var table = document.getElementById('dataTable');
+  var search = document.getElementById('clientsSearch');
+  var btn = document.getElementById('clientsFilterApply');
+  function apply(){
+    if(!table) return;
+    var term = search ? (search.value || '').toLowerCase() : '';
+    table.querySelectorAll('tbody tr').forEach(function(tr){
+      var txt = (tr.innerText || '').toLowerCase();
+      tr.style.display = term ? (txt.indexOf(term) !== -1 ? '' : 'none') : '';
+    });
+  }
+  if (search) search.addEventListener('input', apply);
+  if (btn) btn.addEventListener('click', apply);
+});
+</script>
 <!--  Fin Modal Add Client-->
 
 		
@@ -179,6 +196,15 @@ else {echo "<script>alert('Erreur !!! ')</script>";}
                       
                         
                         <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-5">
+                                    <label for="clientsSearch" class="form-label">Recherche rapide</label>
+                                    <input type="search" class="form-control" id="clientsSearch" placeholder="Rechercher un client">
+                                </div>
+                                <div class="col-md-2 d-flex align-items-end">
+                                    <button type="button" class="btn btn-secondary w-100" id="clientsFilterApply">Filtrer</button>
+                                </div>
+                            </div>
                             <div class="table-responsive">
                                 <table class="table table-bordered" id="dataTable" width="90%" cellspacing="0">
                                     <thead>

@@ -61,91 +61,37 @@ class Factures {
     }
 
     public function deleteFacture($num) {
-        // Ensure we remove any linked entities when a facture is deleted.
+        // Ensure we remove any linked Bon de Commande when a facture is deleted.
         // Do it in a transaction so we don't leave partial state.
-        $cleanNum = trim((string)$num);
         try {
             $this->cnx->beginTransaction();
-            $this->disableForeignKeyChecks();
 
             // Remove payment records before dropping the facture itself so
-            // orphaned entries don't linger in the `reglement` tables.
-            $this->safeExecute("DELETE FROM reglement WHERE num_fact = :num", [':num' => $cleanNum]);
-            $this->safeExecute("DELETE FROM archive_reglement WHERE num_fact_archive = :num", [':num' => $cleanNum]);
+            // orphaned entries don't linger in the `reglement` table.
+            $stReg = $this->cnx->prepare("DELETE FROM reglement WHERE num_fact = :num");
+            $stReg->execute([':num' => $num]);
 
             // Remove Bon de Commande tied to this facture number
             // (Many pages use bon_commande.num_bon_commande == facture.num_fact)
-            $this->safeExecute("DELETE FROM bon_commande WHERE num_bon_commande = :num", [':num' => $cleanNum]);
-
-            // Remove Bordereaux created during the flow (both num_fact and num_bordereaux might match the facture)
-            $this->safeExecute(
-                "DELETE FROM bordereaux WHERE num_fact = :num_fact OR num_bordereaux = :num_bord",
-                [':num_fact' => $cleanNum, ':num_bord' => $cleanNum]
-            );
-            $this->safeExecute("DELETE FROM archive_bordereaux WHERE num_fact = :num", [':num' => $cleanNum]);
-
-            // Remove mirrored Offre de Prix + its lines created alongside the facture
-            $this->safeExecute("DELETE FROM offres_projets WHERE offre = :num", [':num' => $cleanNum]);
-            $this->safeExecute("DELETE FROM offre_prix WHERE num_offre = :num", [':num' => $cleanNum]);
-            $this->safeExecute("DELETE FROM archiveoffre WHERE factureArchive = :num", [':num' => $cleanNum]);
-
-            // Clean any avoir/credit notes referencing this facture so FK constraints cannot block deletion
-            $this->safeExecute(
-                "DELETE FROM facture_avoir_lignes WHERE avoir_id IN (SELECT id FROM facture_avoir WHERE num_fact = :num1 OR num_fact_new = :num2)",
-                [':num1' => $cleanNum, ':num2' => $cleanNum]
-            );
-            $this->safeExecute("DELETE FROM facture_avoir WHERE num_fact = :num1 OR num_fact_new = :num2", [':num1' => $cleanNum, ':num2' => $cleanNum]);
+            $stBc = $this->cnx->prepare("DELETE FROM bon_commande WHERE num_bon_commande = :num");
+            $stBc->execute([':num' => $num]);
 
             // Also clean detail lines if no FK is present
-            $this->safeExecute(
-                "DELETE FROM facture_projets WHERE facture = :num_fact OR facture = TRIM(:num_trim)",
-                [':num_fact' => $cleanNum, ':num_trim' => $cleanNum]
-            );
+            $stLines = $this->cnx->prepare("DELETE FROM facture_projets WHERE facture = :num");
+            $stLines->execute([':num' => $num]);
 
             // Finally delete the facture itself
-            $st = $this->cnx->prepare("DELETE FROM facture WHERE num_fact = :num_fact OR num_fact = TRIM(:num_trim)");
-            $st->execute([':num_fact' => $cleanNum, ':num_trim' => $cleanNum]);
-            $deleted = ($st->rowCount() > 0);
+            $st = $this->cnx->prepare("DELETE FROM facture WHERE num_fact = :num");
+            $st->execute([':num' => $num]);
 
-            $this->enableForeignKeyChecks();
             $this->cnx->commit();
-            return $deleted;
+            return true;
         } catch (\Exception $e) {
             if ($this->cnx->inTransaction()) {
                 $this->cnx->rollBack();
             }
-            // Surface the failure for debugging (web server error log)
-            error_log('[Factures::deleteFacture] Delete failed for '.$cleanNum.' -> '.$e->getMessage());
-            $this->enableForeignKeyChecks();
             return false;
         }
-    }
-
-    /**
-     * Execute a DELETE and ignore "table not found" errors so older databases
-     * missing optional tables (offres_projets, facture_avoir, etc.) do not
-     * block facture deletion.
-     */
-    private function safeExecute(string $sql, array $params = []): void {
-        try {
-            $stmt = $this->cnx->prepare($sql);
-            $stmt->execute($params);
-        } catch (\PDOException $e) {
-            $code = $e->getCode();
-            $msg  = $e->getMessage();
-            if ($code === '42S02' || stripos($msg, 'Base table or view not found') !== false) {
-                return;
-            }
-            throw $e;
-        }
-    }
-
-    private function disableForeignKeyChecks(): void {
-        try { $this->cnx->exec("SET FOREIGN_KEY_CHECKS=0"); } catch (\PDOException $e) { /* ignore */ }
-    }
-
-    private function enableForeignKeyChecks(): void {
-        try { $this->cnx->exec("SET FOREIGN_KEY_CHECKS=1"); } catch (\PDOException $e) { /* ignore */ }
     }
 
     public function deleteFactureByAdresse($num, $adresse, $unused = null) {
@@ -153,9 +99,33 @@ class Factures {
         return $st->execute([':num' => $num, ':adr' => $adresse]);
     }
 
-    public function ModifierAdresseFacture($adresseExiste, $adresseUpdate, $numFacture) {
-        $st = $this->cnx->prepare("UPDATE facture_projets SET adresseClient = :new WHERE facture = :num AND adresseClient = :old");
-        return $st->execute([':new' => $adresseUpdate, ':num' => $numFacture, ':old' => $adresseExiste]);
+    public function ModifierAdresseFacture($adresseExiste, $adresseUpdate, $numFacture, $lineId = null, $scope = 'address') {
+        $facture = (string)$numFacture;
+        $lineId = $lineId !== null ? (int)$lineId : null;
+        $scope = ($scope === 'line') ? 'line' : 'address';
+
+        $newValue = trim((string)$adresseUpdate);
+        $newValue = ($newValue === '') ? null : $newValue;
+
+        if ($scope === 'line' && $lineId) {
+            $st = $this->cnx->prepare("UPDATE facture_projets SET adresseClient = :new WHERE id_Projets_Facture = :id");
+            return $st->execute([':new' => $newValue, ':id' => $lineId]);
+        }
+
+        $oldValue = trim((string)$adresseExiste);
+        if ($oldValue === '') {
+            $sql = "UPDATE facture_projets
+                    SET adresseClient = :new
+                    WHERE facture = :facture AND (adresseClient IS NULL OR adresseClient = '')";
+            $params = [':new' => $newValue, ':facture' => $facture];
+        } else {
+            $sql = "UPDATE facture_projets
+                    SET adresseClient = :new
+                    WHERE facture = :facture AND adresseClient = :old";
+            $params = [':new' => $newValue, ':facture' => $facture, ':old' => $oldValue];
+        }
+        $st = $this->cnx->prepare($sql);
+        return $st->execute($params);
     }
 
     // Check if a facture already has project lines (optionally scoped to an address)
@@ -187,6 +157,13 @@ class Factures {
         }
     }
 
+    // Fully purge all project lines tied to a facture (any address)
+    public function delete_All_Projets_By_Facture($facture) {
+        $facture = (string)$facture;
+        $st = $this->cnx->prepare("DELETE FROM facture_projets WHERE facture = :f");
+        return $st->execute([':f' => $facture]);
+    }
+
     // Insert (used by legacy code named 'ModifierProjets_Facture' after it deletes old lines)
     public function ModifierProjets_Facture($facture, $prix_unit_htv, $qte, $tva, $remise, $prixForfitaire, $prixTTC, $projet, $adresseClient) {
         return $this->AjoutProjets_Facture($facture, $prix_unit_htv, $qte, $tva, $remise, $prixForfitaire, $prixTTC, $projet, $adresseClient);
@@ -201,13 +178,13 @@ class Factures {
 
     public function AfficherFacturesNonRegle() {
         // Only show invoices that are NOT paid according to the `reglement` table.
-        // Logic: include factures with no reglement row OR etat_reglement not equal to 'oui'/'Oui'/'avance'.
+        // Logic: include factures with no reglement row OR etat_reglement not equal to 'oui'/'Oui'.
         $sql = "
             SELECT f.*, clt.nom_client, clt.adresse, clt.numexonoration
             FROM facture AS f
             JOIN clients AS clt ON f.client = clt.id
             LEFT JOIN reglement AS r ON r.num_fact = f.num_fact
-            WHERE LOWER(TRIM(COALESCE(r.etat_reglement, 'non'))) NOT IN ('oui','avoir','avance')
+            WHERE LOWER(TRIM(COALESCE(r.etat_reglement, 'non'))) NOT IN ('oui','avoir')
             ORDER BY f.date DESC
         ";
         $req = $this->cnx->query($sql);
@@ -229,7 +206,7 @@ class Factures {
             $st = $this->cnx->prepare("SELECT * FROM reglement WHERE id_reglement = :id LIMIT 1");
             $st->execute([':id' => $facture]);
         } else {
-            $st = $this->cnx->prepare("SELECT * FROM reglement WHERE num_fact = :num ORDER BY id_reglement DESC LIMIT 1");
+            $st = $this->cnx->prepare("SELECT * FROM reglement WHERE num_fact = :num LIMIT 1");
             $st->execute([':num' => $facture]);
         }
         return $st->fetch();
@@ -272,21 +249,21 @@ class Factures {
             $row = $st->fetch();
             if ($row && isset($row['numboncommande'])) {
                 $display = trim((string)$row['numboncommande']);
-                if ($display === '') {
-                    $display = $facture;
+                if ($display !== '') {
+                    $result = [
+                        'numboncommande' => $display,
+                        'num_bon_commande' => $facture,
+                        'num_bon_commandeClient' => $row['numboncommande'],
+                    ];
                 }
-                $result = [
-                    'numboncommande' => $display,
-                    'num_bon_commande' => $facture,
-                    'num_bon_commandeClient' => $row['numboncommande'],
-                ];
             }
         }
 
+        // If still empty, respect the fact it is blank (do not auto-fill with num_fact)
         if (!$result) {
             $result = [
-                'numboncommande' => $facture,
-                'num_bon_commande' => $facture,
+                'numboncommande' => '',
+                'num_bon_commande' => null,
                 'num_bon_commandeClient' => null,
             ];
         }
@@ -309,6 +286,23 @@ class Factures {
 
     public function getAdresseFactureByNumFacture($facture) {
         $st = $this->cnx->prepare("SELECT DISTINCT(adresseClient) AS adresseClient FROM facture_projets WHERE facture = :f");
+        $st->execute([':f' => $facture]);
+        return $st->fetchAll();
+    }
+
+    public function getAdresseFactureWithProjects($facture) {
+        $sql = "
+            SELECT
+                COALESCE(NULLIF(fp.adresseClient, ''), '') AS adresseClient,
+                COUNT(*) AS nb_lignes,
+                GROUP_CONCAT(DISTINCT COALESCE(p.classement, CONCAT('Projet #', fp.projet)) ORDER BY p.classement SEPARATOR ', ') AS projets
+            FROM facture_projets AS fp
+            LEFT JOIN projet AS p ON fp.projet = p.id
+            WHERE fp.facture = :f
+            GROUP BY COALESCE(NULLIF(fp.adresseClient, ''), '')
+            ORDER BY adresseClient
+        ";
+        $st = $this->cnx->prepare($sql);
         $st->execute([':f' => $facture]);
         return $st->fetchAll();
     }

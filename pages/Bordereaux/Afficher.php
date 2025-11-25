@@ -2,55 +2,6 @@
 include 'class/Bordereaux.class.php';
 
 $bordereaux=$bordereau->getAll();
-$selectedYear = '';
-if (!empty($_GET['year']) && preg_match('/^\d{4}$/', $_GET['year'])) {
-	$selectedYear = $_GET['year'];
-}
-$bordereauRows = [];
-$bordereauYears = [];
-if (!empty($bordereaux)) {
-	foreach ($bordereaux as $factureRow) {
-		$lines = $bordereau->getAllFacturesBordereaux($factureRow['num_fact']);
-		$rowYear = '';
-		if (!empty($lines)) {
-			foreach ($lines as $line) {
-				$maybeYear = isset($line['date']) ? substr((string)$line['date'], 0, 4) : '';
-				if (preg_match('/^\d{4}$/', $maybeYear)) {
-					$rowYear = $maybeYear;
-					$bordereauYears[$maybeYear] = true;
-					break;
-				}
-			}
-		}
-		if ($rowYear === '' && !empty($factureRow['date'])) {
-			$maybeYear = substr((string)$factureRow['date'], 0, 4);
-			if (preg_match('/^\d{4}$/', $maybeYear)) {
-				$rowYear = $maybeYear;
-				$bordereauYears[$maybeYear] = true;
-			}
-		}
-		$bordereauRows[] = [
-			'facture' => $factureRow,
-			'lines' => $lines,
-			'year' => $rowYear,
-		];
-	}
-}
-$bordereauYears = array_keys($bordereauYears);
-rsort($bordereauYears, SORT_STRING);
-if ($selectedYear !== '') {
-	$bordereauRows = array_values(array_filter($bordereauRows, function ($row) use ($selectedYear) {
-		$rowYear = isset($row['year']) ? (string)$row['year'] : '';
-		$factureNum = isset($row['facture']['num_fact']) ? (string)$row['facture']['num_fact'] : '';
-		if ($rowYear === $selectedYear) {
-			return true;
-		}
-		if (strpos($factureNum, '/'.$selectedYear) !== false || strpos($factureNum, $selectedYear.'/') === 0) {
-			return true;
-		}
-		return false;
-	}));
-}
 
 /*********** delete Facture ***************/
  if(isset($_GET['deleteFacture'])){
@@ -88,23 +39,18 @@ else {echo "<script>alert('Erreur !!! ')</script>";}
                             <a href="?Bordereaux&Add" class="btn btn-primary active " style="position:relative; top:20px;"  >Ajout Bordereaux</a>
 							</div>
                         
-                        <div class="card-body">
+                         <div class="card-body">
 							<div class="row mb-3">
-								<div class="col-md-3">
-									<label for="bordereauYearFilter" class="form-label">Filtrer par année</label>
-									<select id="bordereauYearFilter" class="form-control">
-										<option value="">Toutes les années</option>
-										<?php foreach ($bordereauYears as $year) { ?>
-											<option value="<?= htmlspecialchars($year) ?>" <?= $selectedYear === $year ? 'selected' : '' ?>><?= htmlspecialchars($year) ?></option>
-										<?php } ?>
-									</select>
+								<div class="col-md-4">
+									<label for="bordereauxSearch" class="form-label">Recherche rapide</label>
+									<input type="search" class="form-control" id="bordereauxSearch" placeholder="Num bordereau, facture, client...">
 								</div>
 								<div class="col-md-2 d-flex align-items-end">
-									<button type="button" class="btn btn-secondary w-100" id="bordereauYearApply">Filtrer</button>
+									<button type="button" class="btn btn-secondary w-100" id="bordereauxApply">Filtrer</button>
 								</div>
 							</div>
                             <div class="table-responsive">
-                                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0" data-year-filter="#bordereauYearFilter" data-year-column="2">
+                                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                                     <thead>
                                         <tr> 
 										    <th >Numéro Bordereau</th>
@@ -120,25 +66,10 @@ else {echo "<script>alert('Erreur !!! ')</script>";}
                                     </thead>
                                     
                                     <tbody>
-									<?php if(!empty($bordereauRows)){
-										foreach($bordereauRows as $row){
-					$key = $row['facture'];
+									<?php if(!empty($bordereaux)){
+										foreach($bordereaux as $key){
 					$detailBoredereau=$bordereau->GetInfosBordereau($key['num_fact']);
-					$AllBordereauxByFacture=$row['lines'];
-					$rowYear = $row['year'];
-					$bordereauSort = 0;
-					$numFactYear = '';
-					if (!empty($key['num_fact'])) {
-						$parts = explode('/', $key['num_fact']);
-						$numero = isset($parts[0]) ? (int)$parts[0] : 0;
-						$annee  = isset($parts[1]) ? (int)$parts[1] : 0;
-						$bordereauSort = ($annee * 10000) + $numero;
-						if ($annee > 0) {
-							$numFactYear = (string)$annee;
-						}
-					}
-					$yearTokens = array_unique(array_filter([$rowYear, $numFactYear]));
-					$rowYearAttr = implode(' ', $yearTokens);
+					$AllBordereauxByFacture=$bordereau->getAllFacturesBordereaux($key['num_fact']);
 					
 											?>
 <div class="modal fade" id="ModalUpdateBordereaux<?=$key['num_fact']?>" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
@@ -189,8 +120,8 @@ else {echo "<script>alert('Erreur !!! ')</script>";}
 </div>
 <?php if(!empty($AllBordereauxByFacture)){?>
 						<!--  Fin ModalUpdate Bordereaux-->
-	                 <tr<?php if (!empty($rowYearAttr)) { ?> data-year-values="<?= htmlspecialchars($rowYearAttr) ?>"<?php } ?>>
-												<td data-order="<?=$bordereauSort?>">
+	                 <tr>
+												<td>
 												
 												<?=$key['num_fact']?>
 												
@@ -198,7 +129,6 @@ else {echo "<script>alert('Erreur !!! ')</script>";}
 												</td>
 												 <td><?=$key['num_fact']?></td>
 												<td>
-												<?php if($rowYearAttr!==''){?><span class="d-none year-marker"><?=htmlspecialchars($rowYearAttr)?></span><?php } ?>
 												<?php foreach($AllBordereauxByFacture as $cle){?>
 												<?=$cle['date']?>
 												<hr>
@@ -244,21 +174,21 @@ else {echo "<script>alert('Erreur !!! ')</script>";}
                             </div>
                         </div>
                     </div>
+
 <script>
-(function(){
-	var btn=document.getElementById('bordereauYearApply');
-	if(btn){
-		btn.addEventListener('click',function(){
-			var select=document.getElementById('bordereauYearFilter');
-			var year=select?select.value:'';
-			var url=new URL(window.location.href);
-			if(year){
-				url.searchParams.set('year',year);
-			}else{
-				url.searchParams.delete('year');
-			}
-			window.location.href=url.toString();
-		});
-	}
-})();
+document.addEventListener('DOMContentLoaded', function(){
+  var table = document.getElementById('dataTable');
+  var search = document.getElementById('bordereauxSearch');
+  var btn = document.getElementById('bordereauxApply');
+  function apply(){
+    if(!table) return;
+    var term = search ? (search.value || '').toLowerCase() : '';
+    table.querySelectorAll('tbody tr').forEach(function(tr){
+      var txt = (tr.innerText || '').toLowerCase();
+      tr.style.display = term ? (txt.indexOf(term) !== -1 ? '' : 'none') : '';
+    });
+  }
+  if (search) search.addEventListener('input', apply);
+  if (btn) btn.addEventListener('click', apply);
+});
 </script>

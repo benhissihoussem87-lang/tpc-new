@@ -3,34 +3,19 @@ include_once 'class/OffresPrix.class.php';
 include_once 'class/client.class.php';
 $clients=$clt->getAllClients();
 $offres=$offre->AfficherOffres();
+// Build year list from displayed date column and optional filter (client-side)
 $selectedYear = '';
-if (!empty($_GET['year']) && preg_match('/^\d{4}$/', $_GET['year'])) {
-	$selectedYear = $_GET['year'];
-}
 $offreYears = [];
 if (!empty($offres)) {
-	foreach ($offres as $row) {
-		$year = isset($row['date']) ? substr((string)$row['date'], 0, 4) : '';
-		if (preg_match('/^\d{4}$/', $year)) {
-			$offreYears[$year] = true;
-		}
-	}
+    foreach ($offres as $row) {
+        $year = isset($row['date']) ? substr((string)$row['date'], 0, 4) : '';
+        if (preg_match('/^\d{4}$/', $year)) {
+            $offreYears[$year] = true;
+        }
+    }
 }
 $offreYears = array_keys($offreYears);
 rsort($offreYears, SORT_STRING);
-if ($selectedYear !== '') {
-	$offres = array_values(array_filter($offres, function ($row) use ($selectedYear) {
-		$date = isset($row['date']) ? (string)$row['date'] : '';
-		$num  = isset($row['num_offre']) ? (string)$row['num_offre'] : '';
-		if (strpos($date, $selectedYear) === 0) {
-			return true;
-		}
-		if (strpos($num, '/'.$selectedYear) !== false || strpos($num, $selectedYear.'/') === 0) {
-			return true;
-		}
-		return false;
-	}));
-}
 // Générer le num Offre
 $anne=date('Y');
 		if($offres){
@@ -138,9 +123,40 @@ else {echo "<script>alert('Erreur !!! ')</script>";}
 		
 	
 	
-    </div>
-  </div>
-</div>
+						</div>
+                    </div>
+                </div>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+	const search = document.getElementById('offresSearch');
+	const table = document.getElementById('dataTable');
+	const yearSel = document.getElementById('offreYearFilter');
+	const btn = document.getElementById('offreYearApply');
+
+	function applyFilter(){
+		if (!table) return;
+		const term = search ? (search.value || '').toLowerCase() : '';
+		const year = yearSel ? yearSel.value : '';
+		table.querySelectorAll('tbody tr').forEach(function(tr){
+			const txt = (tr.innerText || '').toLowerCase();
+			const matchesTerm = term ? txt.indexOf(term) !== -1 : true;
+			let matchesYear = true;
+			if (year) {
+				const attr = tr.getAttribute('data-year-values') || '';
+				const yearTxt = attr || txt;
+				matchesYear = yearTxt.indexOf(year) !== -1;
+			}
+			tr.style.display = (matchesTerm && matchesYear) ? '' : 'none';
+		});
+	}
+
+	if (search) search.addEventListener('input', applyFilter);
+	if (yearSel) yearSel.addEventListener('change', applyFilter);
+	if (btn) btn.addEventListener('click', applyFilter);
+
+	applyFilter();
+});
+</script>
 <!--  Fin Modal Add Offre-->
 
  <!-- DataTales Example -->
@@ -155,71 +171,55 @@ else {echo "<script>alert('Erreur !!! ')</script>";}
                         
                         <div class="card-body">
 							<div class="row mb-3">
+								<div class="col-md-4">
+									<label for="offresSearch" class="form-label">Recherche rapide</label>
+									<input type="search" class="form-control" id="offresSearch" placeholder="Num offre, client..." data-table-search="#dataTable">
+								</div>
 								<div class="col-md-3">
-								<label for="offreYearFilter" class="form-label">Filtrer par année</label>
-								<select id="offreYearFilter" class="form-control">
-									<option value="">Toutes les années</option>
-									<?php foreach ($offreYears as $year) { ?>
-										<option value="<?= htmlspecialchars($year) ?>" <?= $selectedYear === $year ? 'selected' : '' ?>><?= htmlspecialchars($year) ?></option>
-									<?php } ?>
-								</select>
-							</div>
-							<div class="col-md-2 d-flex align-items-end">
-								<button type="button" class="btn btn-secondary w-100" id="offreYearApply">Filtrer</button>
-							</div>
-							</div>
+									<label for="offreYearFilter" class="form-label">Filtrer par ann&eacute;e</label>
+									<select id="offreYearFilter" class="form-control">
+										<option value="">Toutes les ann&eacute;es</option>
+										<?php foreach ($offreYears as $year) { ?>
+											<option value="<?= htmlspecialchars($year) ?>" <?= $selectedYear === $year ? 'selected' : '' ?>><?= htmlspecialchars($year) ?></option>
+										<?php } ?>
+									</select>
+								</div>
+								<div class="col-md-2 d-flex align-items-end">
+									<button type="button" class="btn btn-secondary w-100" id="offreYearApply">Filtrer</button>
+								</div>
 							</div>
                             <div class="table-responsive">
                                 <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0" data-year-filter="#offreYearFilter" data-year-column="1">
                                     <thead>
-                                        <tr>
-											<th >Num Offre</th>
-											<th >Date Offre</th>
-											<th >Client</th>
-                                           
-											<th >Supprimer</th>
-											<th >Modifier</th>
-											<th >Imprimer</th>
-                                            
-                                        </tr>
+                                         <tr>
+                                            <th>Num Offre</th>
+                                            <th>Date Offre</th>
+                                            <th>Client</th>
+                                            <th>Supprimer</th>
+                                            <th>Modifier</th>
+                                            <th>Imprimer</th>
+                                         </tr>
                                     </thead>
                                     
                                     <tbody>
 									<?php if(!empty($offres)){
 										foreach($offres as $key){
-											//var_dump($key);
 						/********************/
-$ProjetsOffre=$offre->get_AllProjets_ByOffre($key['num_offre']);
-
-// Verification si l'offre est forfitaire ou non 
-$verifForfitaireOffre=null;
-if(!empty($ProjetsOffre)){foreach($ProjetsOffre as $projet){
-	if($projet['prixForfitaire']!=''){$verifForfitaireOffre='forfitaire'; break;}
-	else if($projet['prix_unit_htv']!=''){$verifForfitaireOffre='Nonforfitaire'; break;}
-	
-}}
-$offreSort = 0;
-$offreYear = '';
-if (!empty($key['num_offre'])) {
-	$parts = explode('/', $key['num_offre']);
-	$numero = isset($parts[0]) ? (int)$parts[0] : 0;
-	$annee  = isset($parts[1]) ? (int)$parts[1] : 0;
-	$offreSort = ($annee * 10000) + $numero;
-	if ($annee > 0) {
-		$offreYear = (string)$annee;
-	}
-}
-$offreDateYear = '';
-if (!empty($key['date'])) {
+ $ProjetsOffre=$offre->get_AllProjets_ByOffre($key['num_offre']);
+ 
+ // Verification si l'offre est forfitaire ou non 
+ $verifForfitaireOffre=null;
+ if(!empty($ProjetsOffre)){foreach($ProjetsOffre as $projet){
+ 	if($projet['prixForfitaire']!=''){$verifForfitaireOffre='forfitaire'; break;}
+ 	else if($projet['prix_unit_htv']!=''){$verifForfitaireOffre='Nonforfitaire'; break;}
+ 	
+ }}
+ $yearValue = '';
+ if (!empty($key['date'])) {
 	$maybeYear = substr((string)$key['date'], 0, 4);
-	if (preg_match('/^\d{4}$/', $maybeYear)) {
-		$offreDateYear = $maybeYear;
-	}
-}
-$yearTokens = array_unique(array_filter([$offreYear, $offreDateYear]));
-$rowYearAttr = implode(' ', $yearTokens);
-//echo '<h1> TypeOffre = '.$verifForfitaireOffre.'</h1>';
-?>
+	if (preg_match('/^\\d{4}$/', $maybeYear)) { $yearValue = $maybeYear; }
+ }
+ ?>
 
 <!------------------------------------ Modal Modifier Adresse Offre ----------------->
 <div class="modal fade"  id="ModalUpdateOffre<?=$key['num_offre']?>" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
@@ -356,30 +356,27 @@ $rowYearAttr = implode(' ', $yearTokens);
   </div>
 </div>
 
-											 <tr<?php if (!empty($rowYearAttr)) { ?> data-year-values="<?= htmlspecialchars($rowYearAttr) ?>"<?php } ?>>
-												<td data-order="<?=$offreSort?>"><a href="#">
+											<?php
+												$yearValue = '';
+												if (!empty($key['date'])) {
+													$maybeYear = substr((string)$key['date'], 0, 4);
+													if (preg_match('/^\d{4}$/', $maybeYear)) { $yearValue = $maybeYear; }
+												}
+											?>
+											 <tr<?php if ($yearValue !== '') { ?> data-year-values="<?= htmlspecialchars($yearValue) ?>"<?php } ?>>
+												<td><a href="#">
 												  <?=$key['num_offre']?>
 												  </a>
 												  </td>
-												 <td><?php if($rowYearAttr!==''){?><span class="d-none year-marker"><?=htmlspecialchars($rowYearAttr)?></span><?php } ?><?=$key['date']?></td>
+												 <td><?=$key['date']?></td>
 												<td><?=$key['nom_client']?></td>
-												
 												  <td>
-												 <!-- <a href="?Offres_Prix&deleteOffre=<?=$key['id_offre']?>" class="btn btn-danger">Supprimer</a>
-												  -->
-												   <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#ModalSupprimerOffre<?=$key['num_offre']?>">Supp</button>
-												  </td>
-												  <td>
-												 <!-- <?php if($verifForfitaireOffre=='Nonforfitaire'){?>
-												  <a href="?Offres_Prix&modifier=<?=$key['num_offre']?>&idoffre=<?=$key['id_offre']?>" class="btn btn-warning"> Mod</a>
-												  <?php }
-												  else if($verifForfitaireOffre=='forfitaire'){?>
-												   <a href="?Offres_Prix&modifierOffreForfitaire=<?=$key['num_offre']?>&idoffre=<?=$key['id_offre']?>" class="btn btn-warning"> Mod</a>
-												  <?php }?> -->
-												     <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#ModalUpdateOffre<?=$key['num_offre']?>">Modif</button>
-													 
-												  </td>
-												  <th><a href="./pages/OffresPrix/ModeleOffre.php?offre=<?=$key['num_offre']?>">Imprimer</a></th>
+                                                     <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#ModalSupprimerOffre<?=$key['num_offre']?>">Supp</button>
+                                                    </td>
+                                                    <td>
+                                                       <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#ModalUpdateOffre<?=$key['num_offre']?>">Modif</button>
+                                                    </td>
+                                                    <td><a href="./pages/OffresPrix/ModeleOffre.php?offre=<?=$key['num_offre']?>">Imprimer</a></td>
 											 </tr>
 									<?php }}?>
 									 </tbody>
@@ -387,21 +384,3 @@ $rowYearAttr = implode(' ', $yearTokens);
                             </div>
                         </div>
                     </div>
-<script>
-(function(){
-	var btn=document.getElementById('offreYearApply');
-	if(btn){
-		btn.addEventListener('click',function(){
-			var select=document.getElementById('offreYearFilter');
-			var year=select?select.value:'';
-			var url=new URL(window.location.href);
-			if(year){
-				url.searchParams.set('year',year);
-			}else{
-				url.searchParams.delete('year');
-			}
-			window.location.href=url.toString();
-		});
-	}
-})();
-</script>

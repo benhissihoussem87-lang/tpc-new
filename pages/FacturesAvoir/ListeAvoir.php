@@ -60,6 +60,16 @@ if ($selectedYear !== '') {
       <div class="col-md-2 d-flex align-items-end">
         <button type="button" class="btn btn-secondary w-100" id="avoirYearApply">Filtrer</button>
       </div>
+      <div class="col-md-4 ml-md-auto mt-3 mt-md-0">
+        <label for="avoirSearch" class="form-label">Recherche rapide</label>
+        <input
+          type="search"
+          class="form-control"
+          id="avoirSearch"
+          placeholder="Rechercher un avoir"
+          data-table-search="#dataTable"
+        >
+      </div>
     </div>
     <div class="table-responsive">
       <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0" data-year-filter="#avoirYearFilter" data-year-column="1">
@@ -138,3 +148,7 @@ if ($selectedYear !== '') {
   }
 })();
 </script>
+
+
+
+
