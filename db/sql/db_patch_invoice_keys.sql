@@ -18,29 +18,11 @@ ALTER TABLE `bordereaux`
 ALTER TABLE `reglement`
   MODIFY COLUMN `num_fact` VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL;
 
--- Align offres_projets/offre_prix columns before we widen num_offre
-SET @__fk := (
-    SELECT CONSTRAINT_NAME
-    FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-    WHERE TABLE_SCHEMA = DATABASE()
-      AND TABLE_NAME = 'offres_projets'
-      AND REFERENCED_TABLE_NAME = 'offre_prix'
-      AND REFERENCED_COLUMN_NAME = 'num_offre'
-    LIMIT 1
-);
-SET @__sql := IF(@__fk IS NOT NULL, CONCAT('ALTER TABLE `offres_projets` DROP FOREIGN KEY `', @__fk, '`'), NULL);
-PREPARE __stmt FROM @__sql; EXECUTE __stmt; DEALLOCATE PREPARE __stmt;
-
-ALTER TABLE `offres_projets`
-  MODIFY COLUMN `offre` VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL;
-
 ALTER TABLE `offre_prix`
   MODIFY COLUMN `num_offre` VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL;
 
-ALTER TABLE `offres_projets`
-  ADD CONSTRAINT `offres_projets_ibfk_1`
-  FOREIGN KEY (`offre`) REFERENCES `offre_prix` (`num_offre`)
-  ON UPDATE CASCADE ON DELETE CASCADE;
+ALTER TABLE `bon_commande`
+  MODIFY COLUMN `num_bon_commande` VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL;
 
 ALTER TABLE `facture_projets`
   MODIFY COLUMN `facture` VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL;
@@ -99,8 +81,6 @@ SET @__fk := (SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
                 AND REFERENCED_TABLE_NAME = 'facture' LIMIT 1);
 SET @__sql := IF(@__fk IS NOT NULL, CONCAT('ALTER TABLE `bon_commande` DROP FOREIGN KEY `', @__fk, '`'), NULL);
 PREPARE __stmt FROM @__sql; EXECUTE __stmt; DEALLOCATE PREPARE __stmt;
-ALTER TABLE `bon_commande`
-  MODIFY COLUMN `num_bon_commande` VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL;
 ALTER TABLE `bon_commande`
   ADD CONSTRAINT `bon_commande_ibfk_1`
   FOREIGN KEY (`num_bon_commande`) REFERENCES `facture` (`num_fact`)

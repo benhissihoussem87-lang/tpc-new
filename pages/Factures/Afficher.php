@@ -6,34 +6,6 @@ include 'class/Factures.class.php';
 $clients=$clt->getAllClients();
 $projets=$projet->getAllProjets();
 $factures=$facture->AfficherFactures();
-$selectedYear = '';
-if (!empty($_GET['year']) && preg_match('/^\d{4}$/', $_GET['year'])) {
-	$selectedYear = $_GET['year'];
-}
-$factureYears = [];
-if (!empty($factures)) {
-	foreach ($factures as $row) {
-		$yearCandidate = isset($row['date']) ? substr((string)$row['date'], 0, 4) : '';
-		if (preg_match('/^\d{4}$/', $yearCandidate)) {
-			$factureYears[$yearCandidate] = true;
-		}
-	}
-}
-$factureYears = array_keys($factureYears);
-rsort($factureYears, SORT_STRING);
-if ($selectedYear !== '') {
-	$factures = array_values(array_filter($factures, function ($row) use ($selectedYear) {
-		$date = isset($row['date']) ? (string)$row['date'] : '';
-		$num  = isset($row['num_fact']) ? (string)$row['num_fact'] : '';
-		if (strpos($date, $selectedYear) === 0) {
-			return true;
-		}
-		if (strpos($num, '/'.$selectedYear) !== false || strpos($num, $selectedYear.'/') === 0) {
-			return true;
-		}
-		return false;
-	}));
-}
 
 // Générer le numOffre
 $anne=date('Y');
@@ -70,23 +42,8 @@ $anne=date('Y');
 							</div>
                         
                         <div class="card-body">
-							<div class="row mb-3">
-								<div class="col-md-3">
-									<label for="facturesYearFilter" class="form-label">Filtrer par année</label>
-									<select id="facturesYearFilter" class="form-control">
-										<option value="">Toutes les années</option>
-										<?php foreach ($factureYears as $year) { ?>
-											<option value="<?= htmlspecialchars($year) ?>" <?= $selectedYear === $year ? 'selected' : '' ?>><?= htmlspecialchars($year) ?></option>
-										<?php } ?>
-									</select>
-								</div>
-								<div class="col-md-2 d-flex align-items-end">
-									<button type="button" class="btn btn-secondary w-100" id="facturesYearApply">Filtrer</button>
-								</div>
-							</div>
-							</div>
                             <div class="table-responsive">
-                                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0" data-year-filter="#facturesYearFilter" data-year-column="1">
+                                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                                     <thead>
                                         <tr>
 											<th >Num Facture</th>
@@ -107,27 +64,6 @@ $anne=date('Y');
 									<?php if(!empty($factures)){
 										foreach($factures as $key){
 										$reglementFacture=$facture->GetReglementByFacture($key['num_fact']);
-										// Build a numeric sort key for DataTables so invoices sort naturally
-										$factureSort = 0;
-										$factureYear = '';
-										if (!empty($key['num_fact'])) {
-											$parts = explode('/', $key['num_fact']);
-											$numero = isset($parts[0]) ? (int)$parts[0] : 0;
-											$annee  = isset($parts[1]) ? (int)$parts[1] : 0;
-											$factureSort = ($annee * 10000) + $numero;
-											if ($annee > 0) {
-												$factureYear = (string)$annee;
-											}
-										}
-										$dateYear = '';
-										if (!empty($key['date'])) {
-											$maybeYear = substr((string)$key['date'], 0, 4);
-											if (preg_match('/^\d{4}$/', $maybeYear)) {
-												$dateYear = $maybeYear;
-											}
-										}
-										$yearTokens = array_unique(array_filter([$factureYear, $dateYear]));
-										$rowYearAttr = implode(' ', $yearTokens);
 					
 										$bonCommandeFacture=$facture->GetBonCommandeByFacture($key['num_fact']);
 						/**** Verifier si la facture est forfitaire ou non Forfitaire **********/
@@ -275,11 +211,11 @@ $anne=date('Y');
 </div>
 
 <!--------------- Fin Modal Supprimer Facture et Adresse Facture --------------->
-											 <tr<?php if (!empty($rowYearAttr)) { ?> data-year-values="<?= htmlspecialchars($rowYearAttr) ?>"<?php } ?>>
-												<td data-order="<?=$factureSort?>">
+											 <tr>
+												<td>
 												<a href="?Factures&Projets=<?=$key['num_fact']?>" class="btn btn-success"><?=$key['num_fact']?></a>
 												</td>
-												 <td><?php if($rowYearAttr!==''):?><span class="d-none year-marker"><?=htmlspecialchars($rowYearAttr)?></span><?php endif;?><?=$key['date']?></td>
+												 <td><?=$key['date']?></td>
 												<td><?=$key['nom_client']?></td>
 												<td>
 												<?php if(empty($bonCommandeFacture)){
@@ -336,21 +272,3 @@ $anne=date('Y');
                             </div>
                         </div>
                     </div>
-<script>
-(function(){
-	var applyBtn=document.getElementById('facturesYearApply');
-	if(applyBtn){
-		applyBtn.addEventListener('click',function(){
-			var select=document.getElementById('facturesYearFilter');
-			var year=select ? select.value : '';
-			var url=new URL(window.location.href);
-			if(year){
-				url.searchParams.set('year',year);
-			}else{
-				url.searchParams.delete('year');
-			}
-			window.location.href=url.toString();
-		});
-	}
-})();
-</script>

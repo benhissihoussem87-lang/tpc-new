@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // tpc/pages/Factures/AjoutFactureForfitaire.php
 
 include 'class/client.class.php';
@@ -7,6 +7,7 @@ include 'class/Factures.class.php';
 include 'class/OffresPrix.class.php';
 include 'class/Reglements.class.php';
 require_once 'class/connexion.db.php';
+require_once __DIR__ . '/forfait_form_helpers.php';
 
 /** Same robust generator used here too */
 function getNextInvoiceNumber(PDO $pdo, ?int $year = null): string {
@@ -26,65 +27,112 @@ $factures = $facture->AfficherFactures();
 $anne     = (int)date('Y');
 
 $num_Facture = getNextInvoiceNumber($pdo, $anne);
+$forfaitFormErrors = [];
+$forfaitLinesPrefill = [];
 
 /*************** Facture Forfitaire  *********************/
-if (isset($_REQUEST['btnSubmitAjoutFactureForfitaire'])) {
-  $Numero_Facture = $_POST['num_fact'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_REQUEST['btnSubmitAjoutFactureForfitaire'])) {
+  $rawLines = isset($_POST['lignes']) && is_array($_POST['lignes']) ? $_POST['lignes'] : [];
+  $forfaitLinesPrefill = tpc_prepare_forfait_lines_prefill($rawLines);
 
-  if ($facture->Ajout(@$_POST['num_fact'], @$_POST['client'], @$_POST['numboncommande'], @$_POST['date'], @$_POST['reglement'])) {
+  // Accept free-text projects; just require non-empty projet + prix
+  $validLines = [];
+  foreach ($rawLines as $ln) {
+    if (!is_array($ln)) continue;
+    $proj = trim((string)($ln['projet'] ?? ''));
+    $prix = trim((string)($ln['prix'] ?? ''));
+    $adr  = trim((string)($ln['adresse'] ?? ''));
+    if ($proj === '' || $prix === '') continue;
+    $validLines[] = [
+      'projet' => $proj,
+      'projet_id' => $proj, // free text accepted
+      'prix_raw' => $prix,
+      'adresse' => $adr,
+    ];
+  }
 
-    // Offer header mirror
-    $offre->Ajout(@$_POST['num_fact'], @$_POST['date'], @$_POST['client']);
+  if (empty($validLines)) {
+    $forfaitFormErrors[] = "Ajoutez au moins une ligne avec un projet et un prix forfaitaire.";
+  }
 
-    // 1st project (ENS block)
-    $facture->AjoutProjets_Facture(
-      @$_POST['num_fact'], '', 'ENS', '', '', @$_POST['prixForfitaire'][0], '', @$_POST['projet'][0], @$_POST['adresseClient']
-    );
-    $offre->AjoutProjets_Offre(
-      @$_POST['num_fact'], '', '', '', '', @$_POST['prixForfitaire'][0], '', @$_POST['projet'][0], @$_POST['adresseClient']
-    );
+  $Numero_Facture   = $_POST['num_fact'] ?? '';
+  $clientId         = $_POST['client'] ?? '';
+  $bonCommandeInput = $_POST['numboncommande'] ?? '';
+  $dateFacture      = $_POST['date'] ?? date('Y-m-d');
+  $etatReglement    = $_POST['reglement'] ?? 'non';
 
-    // Reglement line
-    $reglement->Ajout(@$_POST['client'], @$_POST['num_fact'], @implode(" ", $_POST['prixForfitaire']), @$_POST['reglement'], '', '', '', '', '', '', '');
+  if (empty($forfaitFormErrors)) {
+    if ($facture->Ajout($Numero_Facture, $clientId, $bonCommandeInput, $dateFacture, $etatReglement)) {
 
-    // Remaining projects
-    for ($i = 1; $i < count($_POST['projet']); $i++) {
-      $facture->AjoutProjets_Facture(
-        @$_POST['num_fact'], '', '', '', '', @$_POST['prixForfitaire'][$i], '', @$_POST['projet'][$i], @$_POST['adresseClient']
+      // Offer header mirror
+      $offre->Ajout($Numero_Facture, $dateFacture, $clientId);
+
+      $seenAddress = [];
+      foreach ($validLines as $line) {
+        $adrKey = strtolower(trim($line['adresse'] ?? ''));
+        $isFirstForAdr = !isset($seenAddress[$adrKey]);
+        $seenAddress[$adrKey] = true;
+
+        $qteFlag   = $isFirstForAdr ? 'ENS' : '';
+        $pidOrText = $line['projet_id'];
+
+        $facture->AjoutProjets_Facture(
+          $Numero_Facture,
+          '',
+          $qteFlag,
+          '',
+          '',
+          $line['prix_raw'],
+          '',
+          $pidOrText,
+          $line['adresse']
+        );
+
+        // Mirror to offre with same ENS marker per address
+        $offre->AjoutProjets_Offre(
+          $Numero_Facture,
+          '',
+          $qteFlag,
+          '',
+          '',
+          $line['prix_raw'],
+          '',
+          $pidOrText,
+          $line['adresse']
+        );
+      }
+
+      $reglementMontant = implode(' ', array_column($validLines, 'prix_raw'));
+      $reglement->Ajout($clientId, $Numero_Facture, $reglementMontant, $etatReglement, '', '', '', '', '', '', '');
+
+      // Auto-archive the newly created invoice (minimal fields per schema)
+      @$facture->AjoutArchive(
+        $Numero_Facture,  // num_fact
+        $clientId,        // client
+        $dateFacture,     // date
+        '',               // joindre
+        $etatReglement,   // reglement
+        '',               // typeReglement
+        '',               // numcheque
+        '',               // datecheque
+        '',               // retenu
+        ''                // Projets
       );
-      $offre->AjoutProjets_Offre(
-        @$_POST['num_fact'], '', 'ENS', '', '', '', @$_POST['prixForfitaire'][$i], @$_POST['projet'][$i], @$_POST['adresseClient']
-      );
+
+      echo "<script>document.location.href='main.php?Bordereaux&Add&Facture=$Numero_Facture'</script>";
+      exit;
+    } else {
+      $forfaitFormErrors[] = "Erreur lors de l'enregistrement de la facture.";
     }
-
-    // Auto-archive the newly created invoice (minimal fields per schema)
-    @$facture->AjoutArchive(
-      $_POST['num_fact'],           // num_fact
-      $_POST['client'],             // client
-      $_POST['date'],               // date
-      '',                           // joindre (no file at creation)
-      $_POST['reglement'],          // reglement
-      '',                           // typeReglement
-      '',                           // numcheque
-      '',                           // datecheque
-      '',                           // retenu
-      ''                            // Projets
-    );
-
-    echo "<script>document.location.href='main.php?Bordereaux&Add&Facture=$Numero_Facture'</script>";
-  } else {
-    echo "<script>alert('Erreur !!! ')</script>";
   }
 }
-?>
 
-<style>
-/* compact responsive grid of project checkboxes */
-#projectsGrid .project-item { display:inline-block; width:25%; padding:6px 8px; vertical-align:top; }
-@media (max-width: 992px) { #projectsGrid .project-item { width:33.333%; } }
-@media (max-width: 768px)  { #projectsGrid .project-item { width:50%; } }
-@media (max-width: 480px)  { #projectsGrid .project-item { width:100%; } }
-</style>
+$selectedClientId  = $_POST['client'] ?? '';
+$postedBonCommande = $_POST['numboncommande'] ?? '';
+$postedExonoration = $_POST['numexonoration'] ?? '';
+$postedDate        = $_POST['date'] ?? date('Y-m-d');
+$postedReglement   = $_POST['reglement'] ?? 'non';
+?>
 
 <div class="accordion col-12" id="accordionExample">
   <div class="card">
@@ -102,82 +150,66 @@ if (isset($_REQUEST['btnSubmitAjoutFactureForfitaire'])) {
         <form method="post">
           <div class="modal-body row">
 
+            <?php if (!empty($forfaitFormErrors)) { ?>
+            <div class="col-12">
+              <div class="alert alert-danger">
+                <ul class="mb-0">
+                  <?php foreach ($forfaitFormErrors as $err) { ?>
+                  <li><?= htmlspecialchars($err) ?></li>
+                  <?php } ?>
+                </ul>
+              </div>
+            </div>
+            <?php } ?>
+
             <div class="mb-3 col-3">
-              <label for="num_fact" class="col-form-label">NÂ° Facture:</label>
+              <label for="num_fact" class="col-form-label">N&deg; Facture:</label>
               <input type="text" value="<?= htmlspecialchars($num_Facture) ?>" readonly class="form-control" id="num_fact" name="num_fact"/>
             </div>
 
             <div class="mb-3 col-5">
               <label for="client" class="col-form-label">Client:</label>
-              <!-- ðŸ” Client search -->
-              <input type="search" id="clientSearch" class="form-control mb-2" placeholder="ðŸ” Rechercher un client..." autocomplete="off">
+              <!-- Recherche client -->
+              <input type="search" id="clientSearch" class="form-control mb-2" placeholder="Rechercher un client..." autocomplete="off">
               <select class="form-control" id="client" name="client" size="8" style="overflow-y:auto;">
-                <?php if (!empty($clients)) { foreach ($clients as $key) { ?>
-                  <option value="<?= $key['id'] ?>"><?= htmlspecialchars($key['nom_client']) ?></option>
+                <?php if (!empty($clients)) {
+                      foreach ($clients as $key) {
+                        $cid = (string)$key['id'];
+                ?>
+                  <option value="<?= htmlspecialchars($cid) ?>" <?= $selectedClientId === $cid ? 'selected' : '' ?>><?= htmlspecialchars($key['nom_client']) ?></option>
                 <?php }} ?>
               </select>
             </div>
 
             <div class="mb-3 col-3">
-              <label for="numboncommande" class="col-form-label">NÂ° Bon de commande:</label>
-              <input type="text" class="form-control" id="numboncommande" name="numboncommande"/>
+              <label for="numboncommande" class="col-form-label">N&deg; Bon de commande:</label>
+              <input type="text" class="form-control" id="numboncommande" name="numboncommande" value="<?= htmlspecialchars($postedBonCommande) ?>"/>
             </div>
 
             <div class="mb-3 col-3">
-              <label for="numexonoration" class="col-form-label">NÂ° exonoration:</label>
-              <input type="text" class="form-control" id="numexonoration" name="numexonoration"/>
+              <label for="numexonoration" class="col-form-label">N&deg; exonoration:</label>
+              <input type="text" class="form-control" id="numexonoration" name="numexonoration" value="<?= htmlspecialchars($postedExonoration) ?>"/>
             </div>
 
             <div class="mb-3 col-3">
               <label for="date" class="col-form-label">Date Facture:</label>
-              <input type="date" value="<?= date('Y-m-d') ?>" required class="form-control" id="date" name="date"/>
+              <input type="date" value="<?= htmlspecialchars($postedDate) ?>" required class="form-control" id="date" name="date"/>
             </div>
 
             <div class="mb-3 col-2">
               <label for="reglement" class="col-form-label">Reglement:</label>
               <select class="form-control" id="reglement" name="reglement">
-                <option value="oui">Oui</option>
-                <option value="Avance">Avance</option>
-                <option value="non" selected>Non</option>
+                <option value="oui" <?= $postedReglement === 'oui' ? 'selected' : '' ?>>Oui</option>
+                <option value="Avance" <?= $postedReglement === 'Avance' ? 'selected' : '' ?>>Avance</option>
+                <option value="non" <?= $postedReglement === 'non' ? 'selected' : '' ?>>Non</option>
               </select>
             </div>
 
-
-            <div class="mb-3 col-4">
-              <label for="adresse" class="col-form-label">Adresse:</label>
-              <input type="text" class="form-control" id="adresse" name="adresseClient"/>
-            </div>
-
-            <!-- Projets -->
             <div class="mb-3 col-12">
-              <label class="col-form-label col-12">Projets:</label>
-
-              <!-- ðŸ” Project search -->
-              <input type="search" id="projetSearch" class="form-control mb-3" placeholder="ðŸ” Rechercher un projet..." autocomplete="off">
-
-              <div id="projectsGrid">
-                <?php if (!empty($projets)) { foreach ($projets as $cle) {
-                      $pid   = (int)$cle['id'];
-                      $label = (string)$cle['classement'];
-                ?>
-                  <div class="project-item" data-name="<?= htmlspecialchars(mb_strtolower($label), ENT_QUOTES) ?>">
-                    <div class="form-check">
-                      <input class="form-check-input" name="projet[]" type="checkbox" id="inlineCheckbox<?= $pid ?>" value="<?= $pid ?>">
-                      <label class="form-check-label" for="inlineCheckbox<?= $pid ?>"><?= htmlspecialchars($label) ?></label>
-                    </div>
-                  </div>
-                <?php }} ?>
-              </div>
-            </div>
-
-            <!-- Prix Forfitaire -->
-            <div class="mb-3 col-12" style="display:flex; flex-wrap:wrap;">
-              <label class="col-form-label col-12">Prix Forfitaire:</label>
-              <div class="mb-3 col-2"><input type="text" class="form-control" name="prixForfitaire[]"/></div>
-              <div class="mb-3 col-2"><input type="text" class="form-control" name="prixForfitaire[]"/></div>
-              <div class="mb-3 col-2"><input type="text" class="form-control" name="prixForfitaire[]"/></div>
-              <div class="mb-3 col-2"><input type="text" class="form-control" name="prixForfitaire[]"/></div>
-              <div class="mb-3 col-2"><input type="text" class="form-control" name="prixForfitaire[]"/></div>
+              <?php
+                $forfaitLinesWidgetId = 'forfaitLinesAdd';
+                include __DIR__ . '/partials/forfait_lines_widget.php';
+              ?>
             </div>
 
           </div>
@@ -227,22 +259,6 @@ document.addEventListener('keydown', function (e) {
   search.addEventListener('input', filterClients);
   filterClients();
 })();
-
-// Project search (filters checkbox tiles)
-(function(){
-  const input = document.getElementById('projetSearch');
-  const items = Array.from(document.querySelectorAll('#projectsGrid .project-item'));
-  if (!input || !items.length) return;
-
-  function filterProjects(){
-    const q = (input.value || '').toLowerCase().trim();
-    items.forEach(item => {
-      const name = item.getAttribute('data-name') || item.textContent.toLowerCase();
-      item.style.display = (!q || name.includes(q)) ? '' : 'none';
-    });
-  }
-  input.addEventListener('input', filterProjects);
-  filterProjects();
-})();
 </script>
+
 

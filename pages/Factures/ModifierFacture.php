@@ -6,11 +6,47 @@ include 'class/BonsCommandes.class.php';
 include 'class/OffresPrix.class.php';
 $clients=$clt->getAllClients();
 $projets=$projet->getAllProjets();
+$projetsOptionsHtml = '';
+if (!empty($projets)) {
+	foreach ($projets as $projRow) {
+		$projId = (int)($projRow['id'] ?? 0);
+		$projLabel = htmlspecialchars($projRow['classement'] ?? $projRow['designation'] ?? ('Projet '.$projId));
+		$projetsOptionsHtml .= "<option value=\"{$projId}\">{$projLabel}</option>";
+	}
+}
 $infosFacture=$facture->detailFacture($_GET['modifier']);
 $ProjetsFacture=$facture->get_AllProjets_ByFacture($_GET['modifier']);
 $numFacture=$_GET['modifier'];
-foreach($ProjetsFacture as $p);
-$adresseFacture=$p['adresseClient'];
+$adresseFacture='';
+if (!empty($ProjetsFacture)) {
+	$firstLine = $ProjetsFacture[0];
+	$adresseFacture = $firstLine['adresseClient'] ?? '';
+}
+$factureProjectLines = [];
+if (!empty($ProjetsFacture)) {
+	foreach ($ProjetsFacture as $line) {
+		$factureProjectLines[] = [
+			'projet' => isset($line['projet']) ? (int)$line['projet'] : 0,
+			'prix_unit_htv' => $line['prix_unit_htv'] ?? '',
+			'qte' => $line['qte'] ?? 1,
+			'tva' => $line['tva'] ?? '',
+			'remise' => $line['remise'] ?? '',
+			'prixForfitaire' => $line['prixForfitaire'] ?? '',
+			'prixTTC' => $line['prixTTC'] ?? ''
+		];
+	}
+}
+if (empty($factureProjectLines)) {
+	$factureProjectLines[] = [
+		'projet' => 0,
+		'prix_unit_htv' => '',
+		'qte' => 1,
+		'tva' => '',
+		'remise' => '',
+		'prixForfitaire' => '',
+		'prixTTC' => ''
+	];
+}
 
 //echo '<h1> Adresse '.$adresseFacture.'</h1>';
 // Get Num Bon commande Client 
@@ -35,7 +71,7 @@ $bonCommandeClient=$bonCommande->getDetailBonCommandeByNumFacture($_GET['modifie
  if($verifFactureInProjetsFacture){
 	 
  // Modifier Facture
- 	$facture->Modifier(@$_POST['num_fact'],@$_POST['client'],@$_POST['num_fact'],@$_POST['date'],@$_POST['reglement']);
+ 	$facture->Modifier(@$_POST['num_fact'],@$_POST['client'],@$_POST['numboncommande'],@$_POST['date'],@$_POST['reglement']);
 	
     // delete All Project lines then re-insert from the form (for the selected address)
     if($facture->delete_All_Projets_By_FactureAndMultiAdress(@$_POST['num_fact'],@$_POST['adresseClient'])){
@@ -181,81 +217,107 @@ $bonCommandeClient=$bonCommande->getDetailBonCommandeByNumFacture($_GET['modifie
 				<input type="text"  class="form-control" id="adresseClient" name="adresseClient"/>
 				   
 			</div>
-			 <div class="mb-3 col-3">
-				<label for="projet" class="col-form-label">Projets:</label>
+			<div id="factureProjectsContainer">
+				<?php foreach ($factureProjectLines as $line) {
+					$lineProj = (int)$line['projet'];
+					$lineLabel = '';
+					if ($lineProj > 0) {
+						foreach ($projets as $projRow) {
+							if ((int)$projRow['id'] === $lineProj) {
+								$lineLabel = $projRow['classement'] ?? $projRow['designation'] ?? '';
+								break;
+							}
+						}
+					}
+					?>
+				<div class="row g-2 align-items-end mb-2 projet-line" data-line>
+					<div class="col-md-3">
+						<label class="form-label">Projet</label>
+						<select class="form-control projet-select">
+							<option value="">-- Choisir --</option>
+							<?php foreach ($projets as $proj) {
+								$idOpt = (int)$proj['id'];
+								$labelOpt = htmlspecialchars($proj['classement'] ?? $proj['designation'] ?? ('Projet '.$idOpt));
+								$sel = $idOpt === $lineProj ? 'selected' : '';
+								echo "<option value=\"{$idOpt}\" {$sel}>{$labelOpt}</option>";
+							} ?>
+						</select>
+						<input type="hidden" name="idProjet[]" class="line-id" value="<?=$lineProj?>">
+						<input type="hidden" name="projet[]" class="line-label" value="<?=htmlspecialchars($lineLabel)?>">
+					</div>
+					<div class="col-md-2">
+						<label class="form-label">Prix Unitaire H.TVA</label>
+						<input type="text" class="form-control" name="prix_unit_htv[]" value="<?=htmlspecialchars($line['prix_unit_htv'])?>">
+					</div>
+					<div class="col-md-1">
+						<label class="form-label">Qte</label>
+						<input type="number" class="form-control" name="qte[]" min="1" value="<?=htmlspecialchars($line['qte'])?>">
+					</div>
+					<div class="col-md-1">
+						<label class="form-label">TVA</label>
+						<input type="text" class="form-control" name="tva[]" value="<?=htmlspecialchars($line['tva'])?>">
+					</div>
+					<div class="col-md-1">
+						<label class="form-label">Remise</label>
+						<input type="text" class="form-control" name="remise[]" value="<?=htmlspecialchars($line['remise'])?>">
+					</div>
+					<div class="col-md-2">
+						<label class="form-label">Prix Forfitaire</label>
+						<input type="text" class="form-control" name="prixForfitaire[]" value="<?=htmlspecialchars($line['prixForfitaire'])?>">
+					</div>
+					<div class="col-md-2">
+						<label class="form-label">Prix TTC</label>
+						<input type="text" class="form-control" name="prixTTC[]" value="<?=htmlspecialchars($line['prixTTC'])?>">
+					</div>
+					<div class="col-md-12 text-end">
+						<button type="button" class="btn btn-outline-danger btn-sm remove-project-line">Supprimer</button>
+					</div>
+				</div>
+				<?php } ?>
 			</div>
-			<div class="mb-3 col-2">
-				<label for="projet" class="col-form-label">Prix Unitaire H.TVA:</label>
+			<div class="mb-3">
+				<button type="button" class="btn btn-outline-primary btn-sm" id="addProjectLine">Ajouter un projet</button>
 			</div>
-			<div class="mb-3 col-1">
-				<label for="projet" class="col-form-label">Qte:</label>
-			</div>
-			<div class="mb-3 col-1">
-				<label for="projet" class="col-form-label">TVA:</label>
-			</div>
-			<div class="mb-3 col-1">
-				<label for="projet" class="col-form-label">Remise:</label>
-			</div>
-			<div class="mb-3 col-2">
-				<label for="projet" class="col-form-label">Prix Forfitaire:</label>
-			</div>
-			<div class="mb-3 col-2">
-				<label for="projet" class="col-form-label">Prix TTC:</label>
-			</div>
-			<table width=100% id="FormAddFacture">
-				
-				 <?php if(!empty($projets)){
-						foreach($projets as $cle){
-						//Parcour Projets Factures a modifier 
-		$prix_unit_htv=null;$qte=1;$tva=null;$remise=null;$forfitaire=null;$ttc=null;
-		foreach($ProjetsFacture as $p){ if($p['projet']==$cle['id']){
-			$prix_unit_htv=$p['prix_unit_htv'];$qte=$p['qte'];$tva=$p['tva'];
-			$remise=$p['remise'];$forfitaire=$p['prixForfitaire'];
-			$ttc=$p['prixTTC'];
-			}}
-						
-						
-							?>
-	<tr>					
- 
-<div class="mb-3 col-3">
-<input type="hidden" name="idProjet[]" multiple value="<?=$cle['id']?>" readOnly size="4"  />
-	<input type="text" value="<?=$cle['classement']?>" readOnly multiple class="form-control"  name="projet[]"/>
-</div>
-<div class="mb-3 col-2">
-	<input type="text" multiple class="form-control" value="<?=$prix_unit_htv?>"
-	name="prix_unit_htv[]"/>
-</div>
-<div class="mb-3 col-1">
-				
-	<input type="number" value="<?=$qte?>" min="1" value=1 multiple class="form-control"  name="qte[]"/>
-	  
-</div>
-<div class="mb-3 col-1">
-				
-	<input type="text" class="form-control" value="<?=$tva?>" value=19 multiple name="tva[]"/>
-	  
-			</div>
-			<div class="mb-3 col-1">
-				
-			   <input type="text" value="<?=$remise?>" class="form-control" multiple name="remise[]"/>
-	  
-			</div>
-  <div class="mb-3 col-2">
-				
-		<input type="text" class="form-control" value="<?=$forfitaire?>" multiple name="prixForfitaire[]"/>
-	  
-	</div>
-			
-  <div class="mb-3 col-2">
-				
-		<input type="text" class="form-control" value="<?=$ttc?>" multiple name="prixTTC[]"/>
-	  </div>
-</tr>				 
-				 <?php }}  ?>				 
-										
-				
-	</table>		  
+			<template id="project-line-template">
+				<div class="row g-2 align-items-end mb-2 projet-line" data-line>
+					<div class="col-md-3">
+						<label class="form-label">Projet</label>
+						<select class="form-control projet-select">
+							<option value="">-- Choisir --</option>
+							<?=$projetsOptionsHtml?>
+						</select>
+						<input type="hidden" name="idProjet[]" class="line-id" value="">
+						<input type="hidden" name="projet[]" class="line-label" value="">
+					</div>
+					<div class="col-md-2">
+						<label class="form-label">Prix Unitaire H.TVA</label>
+						<input type="text" class="form-control" name="prix_unit_htv[]" value="">
+					</div>
+					<div class="col-md-1">
+						<label class="form-label">Qte</label>
+						<input type="number" class="form-control" name="qte[]" min="1" value="1">
+					</div>
+					<div class="col-md-1">
+						<label class="form-label">TVA</label>
+						<input type="text" class="form-control" name="tva[]" value="">
+					</div>
+					<div class="col-md-1">
+						<label class="form-label">Remise</label>
+						<input type="text" class="form-control" name="remise[]" value="">
+					</div>
+					<div class="col-md-2">
+						<label class="form-label">Prix Forfitaire</label>
+						<input type="text" class="form-control" name="prixForfitaire[]" value="">
+					</div>
+					<div class="col-md-2">
+						<label class="form-label">Prix TTC</label>
+						<input type="text" class="form-control" name="prixTTC[]" value="">
+					</div>
+					<div class="col-md-12 text-end">
+						<button type="button" class="btn btn-outline-danger btn-sm remove-project-line">Supprimer</button>
+					</div>
+				</div>
+			</template>
 		  </div>
 		  <div class="modal-footer">
 			<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
@@ -267,3 +329,59 @@ $bonCommandeClient=$bonCommande->getDetailBonCommandeByNumFacture($_GET['modifie
 						  </div>
                      
                     </div>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+	const container=document.getElementById('factureProjectsContainer');
+	const template=document.getElementById('project-line-template');
+	const addBtn=document.getElementById('addProjectLine');
+	function updateLine(row){
+		if(!row) return;
+		const select=row.querySelector('.projet-select');
+		const idInput=row.querySelector('.line-id');
+		const labelInput=row.querySelector('.line-label');
+		if(select && idInput){
+			idInput.value=select.value || '';
+			if(labelInput){
+				const opt=select.options[select.selectedIndex] || null;
+				labelInput.value=opt ? opt.text.trim() : '';
+			}
+		}
+	}
+	if(container){
+		container.querySelectorAll('.projet-line').forEach(updateLine);
+		container.addEventListener('change',function(e){
+			if(e.target.matches('.projet-select')){
+				updateLine(e.target.closest('.projet-line'));
+			}
+		});
+		container.addEventListener('click',function(e){
+			const removeBtn=e.target.closest('.remove-project-line');
+			if(removeBtn){
+				const line=removeBtn.closest('.projet-line');
+				if(!line) return;
+				const allLines=container.querySelectorAll('.projet-line');
+				if(allLines.length>1){
+					line.remove();
+				}else{
+					line.querySelectorAll('input').forEach(function(input){
+						if(input.type==='number') input.value=1;
+						else input.value='';
+					});
+					const sel=line.querySelector('.projet-select');
+					if(sel){ sel.value=''; }
+					updateLine(line);
+				}
+			}
+		});
+	}
+	if(addBtn && template && container){
+		addBtn.addEventListener('click',function(){
+			const fragment=template.content.cloneNode(true);
+			const newLine=fragment.querySelector('.projet-line');
+			container.appendChild(fragment);
+			const lines=container.querySelectorAll('.projet-line');
+			if(lines.length){ updateLine(lines[lines.length-1]); }
+		});
+	}
+});
+</script>

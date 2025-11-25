@@ -8,6 +8,13 @@ $nbAdresse           = $nbAdresse           ?? 0;
 $date                = $date                ?? '';
 $isExonore           = $isExonore           ?? false;
 
+$bonCommandeValue = '';
+$bonCommandeValue = trim((string)($infosFacture['numboncommande'] ?? ''));
+$numFactValue = trim((string)($infosFacture['num_fact'] ?? ''));
+if ($bonCommandeValue !== '' && $numFactValue !== '' && strcasecmp($bonCommandeValue, $numFactValue) === 0) {
+  $bonCommandeValue = '';
+}
+
 // Nombre => lettres (FR) + Dinars/Millimes
 if (!function_exists('tnd_amount_in_words')) {
   function _fr_under_20(int $n): string {
@@ -284,7 +291,7 @@ html,body{ background:#f6f6f6; margin:0; color:#111; font-family:var(--font) }
       <li>Adresse : <b contenteditable="true"><?= htmlspecialchars($infosFacture['adresse'] ?? '') ?></b></li>
       <li>Matricule Fiscale : <b contenteditable="true"><?= htmlspecialchars($infosFacture['matriculeFiscale'] ?? '') ?></b></li>
       <li>Exonoration N° : <b contenteditable="true"><?= htmlspecialchars($infosFacture['numexonoration'] ?? '') ?></b></li>
-      <li>Bon de commande N° : <b contenteditable="true"><?= htmlspecialchars($bonCommandeFacture['numboncommande'] ?? '') ?></b></li>
+      <li>Bon de commande N° : <b contenteditable="true"><?= htmlspecialchars($bonCommandeValue) ?></b></li>
     </ol>
   </div>
 </template>

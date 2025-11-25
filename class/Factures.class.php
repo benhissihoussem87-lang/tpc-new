@@ -99,9 +99,33 @@ class Factures {
         return $st->execute([':num' => $num, ':adr' => $adresse]);
     }
 
-    public function ModifierAdresseFacture($adresseExiste, $adresseUpdate, $numFacture) {
-        $st = $this->cnx->prepare("UPDATE facture_projets SET adresseClient = :new WHERE facture = :num AND adresseClient = :old");
-        return $st->execute([':new' => $adresseUpdate, ':num' => $numFacture, ':old' => $adresseExiste]);
+    public function ModifierAdresseFacture($adresseExiste, $adresseUpdate, $numFacture, $lineId = null, $scope = 'address') {
+        $facture = (string)$numFacture;
+        $lineId = $lineId !== null ? (int)$lineId : null;
+        $scope = ($scope === 'line') ? 'line' : 'address';
+
+        $newValue = trim((string)$adresseUpdate);
+        $newValue = ($newValue === '') ? null : $newValue;
+
+        if ($scope === 'line' && $lineId) {
+            $st = $this->cnx->prepare("UPDATE facture_projets SET adresseClient = :new WHERE id_Projets_Facture = :id");
+            return $st->execute([':new' => $newValue, ':id' => $lineId]);
+        }
+
+        $oldValue = trim((string)$adresseExiste);
+        if ($oldValue === '') {
+            $sql = "UPDATE facture_projets
+                    SET adresseClient = :new
+                    WHERE facture = :facture AND (adresseClient IS NULL OR adresseClient = '')";
+            $params = [':new' => $newValue, ':facture' => $facture];
+        } else {
+            $sql = "UPDATE facture_projets
+                    SET adresseClient = :new
+                    WHERE facture = :facture AND adresseClient = :old";
+            $params = [':new' => $newValue, ':facture' => $facture, ':old' => $oldValue];
+        }
+        $st = $this->cnx->prepare($sql);
+        return $st->execute($params);
     }
 
     // Check if a facture already has project lines (optionally scoped to an address)
@@ -133,6 +157,13 @@ class Factures {
         }
     }
 
+    // Fully purge all project lines tied to a facture (any address)
+    public function delete_All_Projets_By_Facture($facture) {
+        $facture = (string)$facture;
+        $st = $this->cnx->prepare("DELETE FROM facture_projets WHERE facture = :f");
+        return $st->execute([':f' => $facture]);
+    }
+
     // Insert (used by legacy code named 'ModifierProjets_Facture' after it deletes old lines)
     public function ModifierProjets_Facture($facture, $prix_unit_htv, $qte, $tva, $remise, $prixForfitaire, $prixTTC, $projet, $adresseClient) {
         return $this->AjoutProjets_Facture($facture, $prix_unit_htv, $qte, $tva, $remise, $prixForfitaire, $prixTTC, $projet, $adresseClient);
@@ -153,7 +184,7 @@ class Factures {
             FROM facture AS f
             JOIN clients AS clt ON f.client = clt.id
             LEFT JOIN reglement AS r ON r.num_fact = f.num_fact
-            WHERE LOWER(TRIM(COALESCE(r.etat_reglement, 'non'))) <> 'oui'
+            WHERE LOWER(TRIM(COALESCE(r.etat_reglement, 'non'))) NOT IN ('oui','avoir')
             ORDER BY f.date DESC
         ";
         $req = $this->cnx->query($sql);
@@ -182,9 +213,62 @@ class Factures {
     }
 
     public function GetBonCommandeByFacture($facture) {
-        $st = $this->cnx->prepare("SELECT numboncommande FROM facture WHERE num_fact = :f LIMIT 1");
-        $st->execute([':f' => $facture]);
-        return $st->fetch();
+        $facture = (string)$facture;
+        $result = null;
+
+        // Try dedicated bon_commande table first so we can expose client number + date
+        $st = $this->cnx->prepare("
+            SELECT num_bon_commande,
+                   num_bon_commandeClient,
+                   date_bon_commande,
+                   piecejointe
+            FROM bon_commande
+            WHERE num_bon_commande = :num
+            LIMIT 1
+        ");
+        $st->execute([':num' => $facture]);
+        $row = $st->fetch();
+        if ($row) {
+            $display = trim((string)($row['num_bon_commandeClient'] ?? ''));
+            if ($display === '') {
+                $display = trim((string)($row['num_bon_commande'] ?? ''));
+            }
+            $result = [
+                'numboncommande' => $display,
+                'num_bon_commande' => $row['num_bon_commande'] ?? null,
+                'num_bon_commandeClient' => $row['num_bon_commandeClient'] ?? null,
+                'date_bon_commande' => $row['date_bon_commande'] ?? null,
+                'piecejointe' => $row['piecejointe'] ?? null,
+            ];
+        }
+
+        // Fallback to facture table column if nothing in bon_commande
+        if (!$result) {
+            $st = $this->cnx->prepare("SELECT numboncommande FROM facture WHERE num_fact = :f LIMIT 1");
+            $st->execute([':f' => $facture]);
+            $row = $st->fetch();
+            if ($row && isset($row['numboncommande'])) {
+                $display = trim((string)$row['numboncommande']);
+                if ($display !== '') {
+                    $result = [
+                        'numboncommande' => $display,
+                        'num_bon_commande' => $facture,
+                        'num_bon_commandeClient' => $row['numboncommande'],
+                    ];
+                }
+            }
+        }
+
+        // If still empty, respect the fact it is blank (do not auto-fill with num_fact)
+        if (!$result) {
+            $result = [
+                'numboncommande' => '',
+                'num_bon_commande' => null,
+                'num_bon_commandeClient' => null,
+            ];
+        }
+
+        return $result;
     }
 
     // Detail of a single facture joined with client info
@@ -202,6 +286,23 @@ class Factures {
 
     public function getAdresseFactureByNumFacture($facture) {
         $st = $this->cnx->prepare("SELECT DISTINCT(adresseClient) AS adresseClient FROM facture_projets WHERE facture = :f");
+        $st->execute([':f' => $facture]);
+        return $st->fetchAll();
+    }
+
+    public function getAdresseFactureWithProjects($facture) {
+        $sql = "
+            SELECT
+                COALESCE(NULLIF(fp.adresseClient, ''), '') AS adresseClient,
+                COUNT(*) AS nb_lignes,
+                GROUP_CONCAT(DISTINCT COALESCE(p.classement, CONCAT('Projet #', fp.projet)) ORDER BY p.classement SEPARATOR ', ') AS projets
+            FROM facture_projets AS fp
+            LEFT JOIN projet AS p ON fp.projet = p.id
+            WHERE fp.facture = :f
+            GROUP BY COALESCE(NULLIF(fp.adresseClient, ''), '')
+            ORDER BY adresseClient
+        ";
+        $st = $this->cnx->prepare($sql);
         $st->execute([':f' => $facture]);
         return $st->fetchAll();
     }

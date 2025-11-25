@@ -1,96 +1,96 @@
- <?php 
+<?php 
 include 'class/client.class.php';
 include 'class/Projet.class.php';
 include 'class/Factures.class.php';
 include 'class/BonsCommandes.class.php';
 include 'class/OffresPrix.class.php';
-$clients=$clt->getAllClients();
-$projets=$projet->getAllProjets();
-$factures=$facture->AfficherFactures();
-$infosFacture=$facture->detailFacture($_GET['modifierForfitaire']);
-//var_dump($infosFacture);
-$ProjetsFacture=$facture->get_AllProjets_ByFacture($_GET['modifierForfitaire']);
-$numFacture=$_GET['modifierForfitaire'];
-$bonCommandeClient=$bonCommande->getDetailBonCommandeByNumFacture($_GET['modifierForfitaire']);
-$arrayProjets=array();
-$arrayPrixForfitaire=array();
-/***** get Adresse Facture******/
-$AdressesFacture=$facture->get_All_AdressesClient_ProjetsFacture($_GET['modifierForfitaire']);
+require_once __DIR__ . '/forfait_form_helpers.php';
 
-//var_dump($ProjetsFacture);
-foreach($ProjetsFacture as $p){
-	array_push($arrayProjets,$p['projet']);
-	array_push($arrayPrixForfitaire,$p['prixForfitaire']);
+$clients = $clt->getAllClients();
+$projets = $projet->getAllProjets();
+$factures = $facture->AfficherFactures();
+$infosFacture = $facture->detailFacture($_GET['modifierForfitaire']);
+$ProjetsFacture = $facture->get_AllProjets_ByFacture($_GET['modifierForfitaire']);
+$numFacture = $_GET['modifierForfitaire'];
+$bonCommandeClient = $bonCommande->getDetailBonCommandeByNumFacture($_GET['modifierForfitaire']);
+
+$forfaitLinesPrefill = tpc_prefill_lines_from_db($ProjetsFacture);
+$forfaitFormErrors = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_REQUEST['btnSubmitAjoutFactureForfitaire'])) {
+    $rawLines = isset($_POST['lignes']) && is_array($_POST['lignes']) ? $_POST['lignes'] : [];
+    $forfaitLinesPrefill = tpc_prepare_forfait_lines_prefill($rawLines);
+    $validLines = tpc_extract_valid_forfait_lines($rawLines);
+
+    if (empty($validLines)) {
+        $forfaitFormErrors[] = "Ajoutez au moins une ligne avec un projet et un prix forfaitaire.";
+    }
+
+    $clientId       = $_POST['client'] ?? ($infosFacture['client'] ?? '');
+    $bonCommandeNew = $_POST['numboncommande'] ?? '';
+    $dateFacture    = $_POST['date'] ?? ($infosFacture['date'] ?? date('Y-m-d'));
+    $etatReglement  = $_POST['reglement'] ?? ($infosFacture['reglement'] ?? 'non');
+
+    if (empty($forfaitFormErrors)) {
+        $facture->Modifier($numFacture, $clientId, $bonCommandeNew, $dateFacture, $etatReglement);
+        $facture->delete_All_Projets_By_Facture($numFacture);
+        if (method_exists($offre, 'delete_All_Projets_By_Offre')) {
+            $offre->delete_All_Projets_By_Offre($numFacture);
+        }
+
+        foreach ($validLines as $idx => $line) {
+            $qteFacture = ($idx === 0) ? 'ENS' : '';
+
+            $facture->AjoutProjets_Facture(
+                $numFacture,
+                '',
+                $qteFacture,
+                '',
+                '',
+                $line['prix_raw'],
+                '',
+                $line['projet'],
+                $line['adresse']
+            );
+
+            if ($idx === 0) {
+                $offre->AjoutProjets_Offre(
+                    $numFacture,
+                    '',
+                    '',
+                    '',
+                    '',
+                    $line['prix_raw'],
+                    '',
+                    $line['projet'],
+                    $line['adresse']
+                );
+            } else {
+                $offre->AjoutProjets_Offre(
+                    $numFacture,
+                    '',
+                    'ENS',
+                    '',
+                    '',
+                    '',
+                    $line['prix_raw'],
+                    $line['projet'],
+                    $line['adresse']
+                );
+            }
+        }
+
+        echo "<script>document.location.href='main.php?Factures'</script>";
+        exit;
+    }
 }
 
-/*************** Facture Forfitaire  *********************/
- if(isset($_REQUEST['btnSubmitAjoutFactureForfitaire'])){
-
- ////// si la facture existe déja 
- $verifFactureInProjetsFacture=$facture->VerifFacturedansFacturesProjet($_POST['num_fact'],$_POST['adresseClient']);
-  if($verifFactureInProjetsFacture){
-	//echo '<h1> Facture existe avec l\'adresse '.$_POST['adresseClient'].'</h1>';
-	// Modifier Facture
- 	$facture->Modifier(@$_POST['num_fact'],@$_POST['client'],@$_POST['num_fact'],@$_POST['date'],@$_POST['reglement']);
-    // delete All Project By Facture de num $_POST['num_fact']
-	if($facture->delete_All_Projets_By_FactureAndMultiAdress(@$_POST['num_fact'],@$_POST['adresseClient'])){
-	// Ajout Projet Facture
-		$facture->AjoutProjets_Facture(@$_POST['num_fact'],'',
-		'ENS','','',@$_POST['prixForfitaire'][0],'',@$_POST['projet'][0],@$_POST['adresseClient']
-	  );
-	  
-	   $offre->AjoutProjets_Offre(@$_POST['num_fact'],'','', '','',
-	   @$_POST['prixForfitaire'][0],'',@$_POST['projet'][0],$_POST['adresseClient']
-	  );
-	 
-   /************ Fin Ajout Facture Forfitaire       ********************/
-	for($i=1;$i<count($_POST['projet']);$i++){
-		
-	 // Ajout Projet Facture
-		$facture->AjoutProjets_Facture(@$_POST['num_fact'],'',
-		'','','',@$_POST['prixForfitaire'][$i],'',@$_POST['projet'][$i],@$_POST['adresseClient']
-	  );
-	  // Ajout Projet Offre
-	  
-	  $offre->AjoutProjets_Offre(@$_POST['num_fact'],'','ENS', '',
-	   '',@$_POST['prixForfitaire'][$i],'',@$_POST['projet'][$i],@$_POST['adresseClient']
-	  );
-		 
-	}
-	echo "<script>document.location.href='main.php?Factures'</script>";
- }	
-	  
-  }
-  else {
-	//  echo '<h1> Facture n\'existe pas avec l\'adresse '.$_POST['adresseClient'].'</h1>';
-	  // Modifier Facture
- 	$facture->Modifier(@$_POST['num_fact'],@$_POST['client'],@$_POST['num_fact'],@$_POST['date'],@$_POST['reglement']);
-	// Ajout Projet Facture
-		$facture->AjoutProjets_Facture(@$_POST['num_fact'],'',
-		'ENS','','',@$_POST['prixForfitaire'][0],'',@$_POST['projet'][0],@$_POST['adresseClient']
-	  );
-	  
-	   $offre->AjoutProjets_Offre(@$_POST['num_fact'],'','', '','',@$_POST['prixForfitaire'][0],'',@$_POST['projet'][0],$_POST['adresseClient']
-	  );
-	  
-	  for($i=1;$i<count($_POST['projet']);$i++){
-		
-	 // Ajout Projet Facture
-		$facture->AjoutProjets_Facture(@$_POST['num_fact'],'',
-		'','','',@$_POST['prixForfitaire'][$i],'',@$_POST['projet'][$i],@$_POST['adresseClient']
-	  );
-	  // Ajout Projet Offre
-	  
-	  $offre->AjoutProjets_Offre(@$_POST['num_fact'],'','ENS', '','',@$_POST['prixForfitaire'][$i],'',@$_POST['projet'][$i],@$_POST['adresseClient']
-	  );
-		 
-	}
-	//echo "<script>document.location.href='main.php?Factures'</script>";
-	  
-  }
-
- }
- ?>
+$selectedClientId  = $_POST['client'] ?? ($infosFacture['client'] ?? '');
+$postedBonCommande = $_POST['numboncommande'] ?? ($bonCommandeClient['num_bon_commandeClient'] ?? '');
+$postedExonoration = $_POST['numexonoration'] ?? '';
+$postedDate        = $_POST['date'] ?? ($infosFacture['date'] ?? date('Y-m-d'));
+$postedReglement   = $_POST['reglement'] ?? ($infosFacture['reglement'] ?? 'non');
+?>
  <div class="accordion col-12" id="accordionExample">
  <div class="card">
     <div class="card-header" id="headingTwo">
@@ -105,118 +105,73 @@ foreach($ProjetsFacture as $p){
       <div class="card-body">
        	<!--Form Add Facture-->
 					<form method="post"   >
-		  <div class="modal-body row">
-			<div class="mb-3 col-3">
-			
-				<label for="num_fact " class="col-form-label">N° Facture:</label>
-				<input type="text" value="<?=$infosFacture['num_fact']?>" readOnly class="form-control" id="num_fact " name="num_fact"/>
-				   
-			</div>
-			  <div class="mb-3 col-5">
-				<label for="client" class="col-form-label">Client:</label>
-				
-				<select class="form-control" id="client" name="client">
-				 <?php if(!empty($clients)){
-						foreach($clients as $key){?>
-				 <option value="<?=$key['id']?>" <?php if($infosFacture['nom_client']==$key['nom_client']){echo 'selected';}?>>
-				 <?=$key['nom_client']?>
-				 </option>
-				 <?php }} ?>				 
-										
-				</select>
-				   
-			  </div>
-			  <div class="mb-3 col-3">
-			<label for="numboncommande  " class="col-form-label">N° Bon de commande:</label>
-				<input type="text" value="<?=$bonCommandeClient['num_bon_commandeClient']?>"  class="form-control" id="numboncommande"
-				name="numboncommande"/>
-				
-				</div>
-			  <div class="mb-3 col-3">
-			<label for="numboncommande  " class="col-form-label">N° exonoration:</label>
-				<input type="text"  class="form-control" id="numexonoration"
-				name="numexonoration"/>
-				   
-			</div>
-			  
-			  <div class="mb-3 col-3" >
-				<label for="date" class="col-form-label">Date Facture:</label>
-				<input type="date" value="<?=$infosFacture['date'] ?>" required  class="form-control" id="date" name="date"/>
-				   
-			</div>
-			<div class="mb-3 col-2" >
-				<label for="reglement" class="col-form-label">Reglement :</label>
-			<select class="form-control" id="reglement" name="reglement">
-			  <option value="oui" <?php if($infosFacture['reglement']=='oui'){?> selected <?php } ?> >Oui</option>
-			  <option value="non" <?php if($infosFacture['reglement']=='non'){?> selected <?php } ?> >Non</option>
-			  <option value="Avance" <?php if($infosFacture['reglement']=='Avance'){?> selected <?php } ?> >Avance</option>
+	  <div class="modal-body row">
+		<?php if (!empty($forfaitFormErrors)) { ?>
+		<div class="col-12">
+		  <div class="alert alert-danger">
+			<ul class="mb-0">
+			  <?php foreach ($forfaitFormErrors as $err) { ?>
+			  <li><?= htmlspecialchars($err) ?></li>
+			  <?php } ?>
+			</ul>
+		  </div>
+		</div>
+		<?php } ?>
+		<div class="mb-3 col-3">
+			<label for="num_fact " class="col-form-label">N&deg; Facture:</label>
+			<input type="text" value="<?= htmlspecialchars($infosFacture['num_fact'] ?? $numFacture) ?>" readOnly class="form-control" id="num_fact " name="num_fact"/>
+		</div>
+		  <div class="mb-3 col-5">
+			<label for="client" class="col-form-label">Client:</label>
+			<select class="form-control" id="client" name="client">
+			 <?php if(!empty($clients)){
+				foreach($clients as $key){
+				  $cid = (string)$key['id'];
+			?>
+		 <option value="<?= htmlspecialchars($cid) ?>" <?php if($selectedClientId == $cid){echo 'selected';}?>>
+		 <?= htmlspecialchars($key['nom_client']) ?>
+		 </option>
+		 <?php }} ?>				 
 			</select>
-				   
-			</div>
-			 <div class="mb-3 col-4">
-			<label for="adresse" class="col-form-label">Adresse:</label>
-			<input list="adresses" class="form-control" id="adresse" name="adresseClient">
-			<datalist id="adresses">
-			<?php
-            if(!empty($AdressesFacture)){
-			foreach($AdressesFacture as $a){?>
-             <option value="<?=$a['adresseClient']?>">
-			<?php }} ?>
-			</datalist>
-				   
-			</div>
-			<div class="mb-3 col-12">
-				<label for="projet" class="col-form-label col-12">Projets:</label>
-				<?php if(!empty($projets)){
-						foreach($projets as $cle){
-					 if(in_array($cle['id'],$arrayProjets)){
-						 $check="checked";
-					 }
-					 else {
-						  $check="";
-					 }
-                   				
-						?>
-					<div class="form-check form-check-inline col-3" >
-				  <input class="form-check-input" name="projet[]" multiple type="checkbox" id="inlineCheckbox<?=$cle['id']?>" <?=$check ?>  value="<?=$cle['id']?>">
-				  <label class="form-check-label" for="inlineCheckbox<?=$cle['id']?>"><?=$cle['classement']?></label>
-				</div>
-			 
-				 <?php }} ?>				 
-	
-			</div>	
-		<!-- Champs Forfitaire **************-->
-		     <div class="mb-3 col-12" style="display:flex">
-	<label for="projet" class="col-form-label col-2">Prix Forfitaire:</label>
-	
-	<div class="mb-3 col-2">
-      <input type="text" class="form-control" value="<?=@$arrayPrixForfitaire[0] ?>" multiple name="prixForfitaire[]"/>
-	  
-	</div>
-	<div class="mb-3 col-2">
-      <input type="text" class="form-control" multiple value="<?=@$arrayPrixForfitaire[1]?>"  name="prixForfitaire[]"/> 
-	</div>
-	<div class="mb-3 col-2">
-      <input type="text" class="form-control" multiple value="<?=@$arrayPrixForfitaire[2]?>"  name="prixForfitaire[]"/>
-	 </div>
-  <div class="mb-3 col-2">
-      <input type="text" class="form-control" multiple name="prixForfitaire[]"/>
-	</div>
-   <div class="mb-3 col-2">
-      <input type="text" class="form-control" multiple value="<?=@$arrayPrixForfitaire[3]?>"  name="prixForfitaire[]"/>
-	</div>	
-</div>	
-		<!-- End Forfitaire --------------------->
 		  </div>
-		  <div class="modal-footer">
-			<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
-			<?php if(isset($_GET['modifierForfitaire'])){?>
-			<button type="submit" class="btn btn-primary" name="btnSubmitAjoutFactureForfitaire" >Modifier</button>
-			<?php } ?>
+		  <div class="mb-3 col-3">
+		<label for="numboncommande" class="col-form-label">N&deg; Bon de commande:</label>
+			<input type="text" value="<?= htmlspecialchars($postedBonCommande) ?>"  class="form-control" id="numboncommande"
+			name="numboncommande"/>
 		  </div>
-		  </form>
-		
-					<!--Fin Form Add Facture-->
+		  <div class="mb-3 col-3">
+		<label for="numexonoration" class="col-form-label">N&deg; exonoration:</label>
+			<input type="text"  class="form-control" id="numexonoration"
+			name="numexonoration" value="<?= htmlspecialchars($postedExonoration) ?>"/>
+		  </div>
+		  
+		  <div class="mb-3 col-3" >
+			<label for="date" class="col-form-label">Date Facture:</label>
+			<input type="date" value="<?= htmlspecialchars($postedDate) ?>" required  class="form-control" id="date" name="date"/>
+		  </div>
+		<div class="mb-3 col-2" >
+			<label for="reglement" class="col-form-label">Reglement :</label>
+		<select class="form-control" id="reglement" name="reglement">
+		  <option value="oui" <?php if($postedReglement=='oui'){?> selected <?php } ?> >Oui</option>
+		  <option value="non" <?php if($postedReglement=='non'){?> selected <?php } ?>>Non</option>
+		  <option value="Avance" <?php if($postedReglement=='Avance'){?> selected <?php } ?>>Avance</option>
+		</select>
+		</div>
+		<div class="mb-3 col-12">
+		  <?php
+			$forfaitLinesWidgetId = 'forfaitLinesEdit';
+			include __DIR__ . '/partials/forfait_lines_widget.php';
+		  ?>
+		</div>
+  	</div>
+	  <div class="modal-footer">
+		<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+		<?php if(isset($_GET['modifierForfitaire'])){?>
+		<button type="submit" class="btn btn-primary" name="btnSubmitAjoutFactureForfitaire" >Modifier</button>
+		<?php } ?>
+	  </div>
+	  </form>
+		<!--Fin Form Add Facture-->
       </div>
     </div>
  
