@@ -73,7 +73,7 @@ $anne=date('Y');
 								</div>
 							</div>
                             <div class="table-responsive">
-                                <table class="table table-bordered dt-extra-controls" id="dataTable" width="100%" cellspacing="0" data-year-column="1">
+                                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0" data-year-column="1">
                                     <thead>
                                         <tr>
 											<th >Num Facture</th>
@@ -188,16 +188,13 @@ document.addEventListener('DOMContentLoaded', function(){
 	// Hide DataTables default controls (we use custom ones)
 	const dtFilters = document.querySelectorAll('#dataTable_wrapper .dataTables_filter');
 	dtFilters.forEach(el => { el.style.display = 'none'; });
-	const extraControls = document.querySelectorAll('.dt-extra-controls');
-	extraControls.forEach(el => el.parentNode && el.parentNode.removeChild(el));
 	const dtLengths = document.querySelectorAll('#dataTable_wrapper .dataTables_length');
 	dtLengths.forEach(el => { el.style.display = 'none'; });
 });
 </script>
 <style>
   #dataTable_wrapper .dataTables_filter,
-  #dataTable_wrapper .dataTables_length,
-  #dataTable_wrapper .dt-extra-controls {
+  #dataTable_wrapper .dataTables_length {
     display: none !important;
   }
 </style>
