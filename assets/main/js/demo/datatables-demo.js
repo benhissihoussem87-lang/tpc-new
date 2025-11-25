@@ -120,19 +120,27 @@
       // Normalize common separators so "31-2024" matches "31/2024"
       term = term.replace(/-/g, '/');
       var yearVal = yearSelect ? yearSelect.value : '';
+
+      // Apply via DataTables if present
       if (dtInstance && typeof dtInstance.search === 'function') {
-        dtInstance.search(term || '').draw();
-        if (yearSelect && yearVal) { dtInstance.draw(); }
-        return;
+        dtInstance.search(term || '');
+        if (yearSelect && yearVal) {
+          dtInstance.column(parseInt($table.attr('data-year-column') || 0, 10) || 0).search(yearVal, false, false);
+        } else if (yearSelect) {
+          dtInstance.column(parseInt($table.attr('data-year-column') || 0, 10) || 0).search('');
+        }
+        dtInstance.draw();
       }
+
+      // Manual fallback to guarantee filtering even if DataTables fails to initialize
       var rows = $table.find('tbody tr');
       rows.each(function() {
-        var text = (this.innerText || '').toLowerCase();
+        var text = (this.getAttribute('data-search-text') || this.innerText || '').toLowerCase().replace(/-/g,'/'); // normalize
         var matchesTerm = term ? (text.indexOf(term) !== -1) : true;
         var matchesYear = true;
         if (yearVal) {
           var attr = this.getAttribute('data-year-values') || '';
-          var yearText = attr || text;
+          var yearText = (attr || text).replace(/-/g,'/');
           matchesYear = yearText.indexOf(yearVal) !== -1;
         }
         this.style.display = (matchesTerm && matchesYear) ? '' : 'none';
@@ -212,6 +220,7 @@
         // Keep searching enabled; we wire custom controls to the DataTables API.
         options.searching = true;
       }
+      options.autoWidth = false;
       var orderColAttr = $table.attr('data-order-column');
       if (typeof orderColAttr !== 'undefined') {
         var orderDir = $table.attr('data-order-direction') || 'desc';

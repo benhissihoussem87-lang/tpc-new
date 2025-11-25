@@ -11,7 +11,7 @@ $Reglements=$reglement->getAll();
                         
                         <div class="card-body">
                             <div class="table-responsive">
-                                <table class="table table-bordered dt-extra-controls" id="dataTable" width="100%" cellspacing="0" data-year-column="2">
+                                <table class="table table-bordered dt-extra-controls" id="dataTable" width="100%" cellspacing="0">
                                     <thead>
                                         <tr> 
 										<th>Facture</th>
@@ -31,8 +31,14 @@ $Reglements=$reglement->getAll();
                                     <tbody>
 									 <?php if(!empty($Reglements)){
 										foreach($Reglements as $key){
-						$DetailReglements=$reglement->getAllReglement($key['num_fact']);?>
-									 <tr>
+						$DetailReglements=$reglement->getAllReglement($key['num_fact']);
+						$searchText = strtolower(trim(
+							($key['num_fact'] ?? '').' '.
+							($key['nom_client'] ?? '').' '.
+							implode(' ', array_column($DetailReglements, 'etat_reglement'))
+						));
+						?>
+									 <tr data-search-text="<?= htmlspecialchars($searchText) ?>">
 									<td><?=$key['num_fact']?></td>
 									<td><?=$key['nom_client']?></td>
 									 <td align="right">
