@@ -201,7 +201,26 @@ class Factures {
 
     // Some pages expect a method named AfficherAllFactures()
     public function AfficherAllFactures() {
-        $sql = "SELECT f.*, clt.nom_client FROM facture AS f JOIN clients AS clt ON f.client = clt.id ORDER BY f.date DESC";
+        $sql = "SELECT f.*, clt.nom_client
+                FROM facture AS f
+                JOIN clients AS clt ON f.client = clt.id
+                ORDER BY f.date DESC";
+        $req = $this->cnx->query($sql);
+        return $req->fetchAll();
+    }
+
+    // List only invoices that do NOT yet have a bordereau.
+    // Used by Bordereaux/Ajout so the dropdown doesn't propose
+    // a facture that already has an entry in `bordereaux`.
+    public function AfficherFacturesSansBordereaux() {
+        $sql = "
+            SELECT f.*, clt.nom_client
+            FROM facture AS f
+            JOIN clients AS clt ON f.client = clt.id
+            LEFT JOIN bordereaux AS b ON b.num_fact = f.num_fact
+            WHERE b.id IS NULL
+            ORDER BY f.date DESC
+        ";
         $req = $this->cnx->query($sql);
         return $req->fetchAll();
     }

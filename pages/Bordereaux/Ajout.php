@@ -2,7 +2,14 @@
 include 'class/Bordereaux.class.php';
 
 include 'class/Factures.class.php';
-$factures=$facture->AfficherAllFactures();
+// For a generic Bordereau add (no specific facture in URL),
+// only list factures that do NOT yet have a bordereau entry.
+if (!isset($_GET['Facture'])) {
+    $factures = $facture->AfficherFacturesSansBordereaux();
+} else {
+    // When coming from a given facture, keep existing behavior.
+    $factures = $facture->AfficherAllFactures();
+}
 
 // Ajout Bodereau
  
