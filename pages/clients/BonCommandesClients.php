@@ -19,7 +19,7 @@ $client=$clt->getClient($_GET['BonsCommandesclient']);
                         
                         <div class="card-body">
                             <div class="table-responsive">
-                                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0" >
+                                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0" data-order-column="2" data-order-direction="asc">
                                     <thead>
                                         <tr>
 											<th >Num Bon Commande Facture</th>

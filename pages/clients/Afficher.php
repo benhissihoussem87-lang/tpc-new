@@ -237,7 +237,7 @@ document.addEventListener('DOMContentLoaded', function(){
                                 </div>
                             </div>
                             <div class="table-responsive" id="clientsTableWrapper">
-                                <table class="table table-bordered clients-table" id="dataTable" width="100%" cellspacing="0">
+                                <table class="table table-bordered clients-table" id="dataTable" width="100%" cellspacing="0" data-order-column="0" data-order-direction="asc">
                                     <thead>
                                         <tr>
 											<th >Code</th>

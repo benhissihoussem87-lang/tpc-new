@@ -213,12 +213,9 @@
       var options = {};
       if (addExtras) {
         options.dom = domLayout;
-        // Keep searching enabled; we wire custom controls to the DataTables API,
-        // but disable automatic column ordering so server-side row order is preserved.
+        // Keep searching enabled; we wire custom controls to the DataTables API.
         options.searching = true;
-        options.ordering = false;
       }
-      // Preserve server-side row order by default unless an explicit column is given.
       options.order = [];
       options.autoWidth = false;
       var orderColAttr = $table.attr('data-order-column');

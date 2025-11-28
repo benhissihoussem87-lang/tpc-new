@@ -234,7 +234,7 @@ document.addEventListener('DOMContentLoaded', function(){
 								</div>
 							</div>
                             <div class="table-responsive">
-                                <table class="table table-bordered no-dt-controls" id="dataTable" width="100%" cellspacing="0" data-year-filter="#offreYearFilter" data-year-column="1">
+                                <table class="table table-bordered no-dt-controls" id="dataTable" width="100%" cellspacing="0" data-year-filter="#offreYearFilter" data-year-column="1" data-order-column="1" data-order-direction="asc">
                                     <thead>
                                          <tr>
                                             <th>Num Offre</th>

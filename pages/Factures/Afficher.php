@@ -73,7 +73,15 @@ $anne=date('Y');
 								</div>
 							</div>
                             <div class="table-responsive">
-                                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0" data-year-column="1">
+                                <table
+                                    class="table table-bordered"
+                                    id="dataTable"
+                                    width="100%"
+                                    cellspacing="0"
+                                    data-year-column="1"
+                                    data-order-column="1"
+                                    data-order-direction="asc"
+                                >
                                     <thead>
                                         <tr>
 											<th >Num Facture</th>
@@ -179,11 +187,20 @@ document.addEventListener('DOMContentLoaded', function(){
 		});
 	}
 
-	if (search) search.addEventListener('input', applyFilter);
-	if (yearSel) yearSel.addEventListener('change', applyFilter);
-	if (btn) btn.addEventListener('click', applyFilter);
+	let filterTimeout = null;
+	function scheduleFilter() {
+		if (!table) return;
+		if (filterTimeout) {
+			clearTimeout(filterTimeout);
+		}
+		filterTimeout = setTimeout(applyFilter, 250);
+	}
 
-	applyFilter();
+	if (search) search.addEventListener('input', scheduleFilter);
+	if (yearSel) yearSel.addEventListener('change', scheduleFilter);
+	if (btn) btn.addEventListener('click', scheduleFilter);
+
+	scheduleFilter();
 
 	// Hide DataTables default controls (we use custom ones)
 	const dtFilters = document.querySelectorAll('#dataTable_wrapper .dataTables_filter');

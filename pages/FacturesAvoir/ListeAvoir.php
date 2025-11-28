@@ -72,7 +72,7 @@ if ($selectedYear !== '') {
       </div>
     </div>
     <div class="table-responsive">
-      <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0" data-year-filter="#avoirYearFilter" data-year-column="1">
+      <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0" data-year-filter="#avoirYearFilter" data-year-column="1" data-order-column="1" data-order-direction="asc">
         <thead>
           <tr>
             <th>Num Avoir</th>

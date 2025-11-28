@@ -19,7 +19,7 @@ $BonsCommandes=$bonCommande->getAll();
                         
                          <div class="card-body">
                             <div class="table-responsive">
-                                <table class="table table-bordered dt-extra-controls" id="dataTable" width="100%" cellspacing="0" data-year-column="1">
+                                <table class="table table-bordered dt-extra-controls" id="dataTable" width="100%" cellspacing="0" data-year-column="1" data-order-column="2" data-order-direction="asc">
                                     <thead>
                                         <tr> 
 										    <th  >N° Bon Commande Facture</th>
