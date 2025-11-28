@@ -213,8 +213,10 @@
       var options = {};
       if (addExtras) {
         options.dom = domLayout;
-        // Keep searching enabled; we wire custom controls to the DataTables API.
+        // Keep searching enabled; we wire custom controls to the DataTables API,
+        // but disable automatic column ordering so server-side row order is preserved.
         options.searching = true;
+        options.ordering = false;
       }
       // Preserve server-side row order by default unless an explicit column is given.
       options.order = [];
