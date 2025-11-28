@@ -323,29 +323,8 @@ if (isset($_GET['Avoir']) && isset($_GET['View']) && isset($_GET['id'])) {
     <script src="assets/main/vendor/datatables/jquery.dataTables.min.js"></script>
     <script src="assets/main/vendor/datatables/dataTables.bootstrap4.min.js"></script>
 
-    <!-- Page level custom scripts -->
+    <!-- Page level custom scripts (includes DataTables bootstrap + filters) -->
     <script src="assets/main/js/demo/datatables-demo.js"></script>
-    <script>
-    // Hard fallback: ensure any #dataTable on the page gets initialized with search/filter UI.
-    (function() {
-      function init() {
-        if (!window.jQuery || !$.fn || !$.fn.DataTable) { return; }
-        var domLayout = "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
-                        "<'row'<'col-sm-12'tr>>" +
-                        "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>";
-        $('table#dataTable').each(function(){
-          var $t = $(this);
-          if ($.fn.DataTable.isDataTable($t)) { $t.DataTable().destroy(); }
-          $t.DataTable({ dom: domLayout });
-        });
-      }
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-      } else {
-        init();
-      }
-    })();
-    </script>
 
 </body>
 
