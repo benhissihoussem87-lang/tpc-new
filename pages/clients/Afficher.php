@@ -94,6 +94,24 @@ document.addEventListener('DOMContentLoaded', function(){
   #dataTable_wrapper .dataTables_length {
     display: none !important;
   }
+  /* Keep Supp/Mod columns visible when horizontally scrolling */
+  #clientsTableWrapper {
+    position: relative;
+  }
+  .clients-table th.sticky-supp,
+  .clients-table td.sticky-supp {
+    position: sticky;
+    right: 90px;
+    z-index: 3;
+    background: #fff;
+  }
+  .clients-table th.sticky-mod,
+  .clients-table td.sticky-mod {
+    position: sticky;
+    right: 0;
+    z-index: 3;
+    background: #fff;
+  }
 </style>
 <!--  Fin Modal Add Client-->
 
@@ -218,8 +236,8 @@ document.addEventListener('DOMContentLoaded', function(){
                                     <button type="button" class="btn btn-secondary w-100" id="clientsFilterApply">Filtrer</button>
                                 </div>
                             </div>
-                            <div class="table-responsive">
-                                <table class="table table-bordered" id="dataTable" width="90%" cellspacing="0">
+                            <div class="table-responsive" id="clientsTableWrapper">
+                                <table class="table table-bordered clients-table" id="dataTable" width="100%" cellspacing="0">
                                     <thead>
                                         <tr>
 											<th >Code</th>
@@ -234,8 +252,8 @@ document.addEventListener('DOMContentLoaded', function(){
                                             <th >Piece Exonoration</th>
                                             <th >N° Téléphone</th>
                                             <th >Email</th>
-											<th >Supp</th>
-											<th >Mod</th>
+											<th class="sticky-supp">Supp</th>
+											<th class="sticky-mod">Mod</th>
                                             
                                         </tr>
                                     </thead>
@@ -257,8 +275,8 @@ document.addEventListener('DOMContentLoaded', function(){
 											<?=$key['pieceExonoration']?></a></td>
 											 <td><?=$key['tel']?></td>
 											  <td><?=$key['email']?></td>
-											   <td><a href="?Gestion_Clients&deleteClient=<?=$key['id']?>" class="btn btn-danger">Supp</td>
-											   <td class="updateClient"><a id="<?=$key['id']?>" data-bs-toggle="modal" data-bs-target="#ModalUpdateClient" href="#" class="btn btn-warning">Mod</td>
+											   <td class="sticky-supp"><a href="?Gestion_Clients&deleteClient=<?=$key['id']?>" class="btn btn-danger">Supp</a></td>
+											   <td class="updateClient sticky-mod"><a id="<?=$key['id']?>" data-bs-toggle="modal" data-bs-target="#ModalUpdateClient" href="#" class="btn btn-warning">Mod</a></td>
                                         </tr>
 									<?php } } ?>
                                         
