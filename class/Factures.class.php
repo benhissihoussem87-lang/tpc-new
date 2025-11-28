@@ -171,7 +171,15 @@ class Factures {
 
     // ---------------- Queries ----------------
     public function AfficherFactures() {
-        $sql = "SELECT f.*, clt.nom_client, clt.adresse, clt.numexonoration FROM facture AS f, clients AS clt WHERE f.client = clt.id ORDER BY f.date DESC";
+        // Order by numeric prefix of num_fact then by year, so 200/2025 comes after 99/2025
+        $sql = "
+            SELECT f.*, clt.nom_client, clt.adresse, clt.numexonoration
+            FROM facture AS f
+            JOIN clients AS clt ON f.client = clt.id
+            ORDER BY
+              CAST(SUBSTRING_INDEX(f.num_fact,'/',1) AS UNSIGNED) ASC,
+              CAST(SUBSTRING_INDEX(f.num_fact,'/',-1) AS UNSIGNED) ASC
+        ";
         $req = $this->cnx->query($sql);
         return $req->fetchAll();
     }

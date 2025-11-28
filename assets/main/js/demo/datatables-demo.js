@@ -216,6 +216,8 @@
         // Keep searching enabled; we wire custom controls to the DataTables API.
         options.searching = true;
       }
+      // Preserve server-side row order by default unless an explicit column is given.
+      options.order = [];
       options.autoWidth = false;
       var orderColAttr = $table.attr('data-order-column');
       if (typeof orderColAttr !== 'undefined') {
