@@ -67,18 +67,38 @@ else {echo "<script>alert('Erreur !!! ')</script>";}
 </div>
 <script>
 document.addEventListener('DOMContentLoaded', function(){
-  var table = document.getElementById('dataTable');
+  var table  = document.getElementById('dataTable');
   var search = document.getElementById('clientsSearch');
-  var btn = document.getElementById('clientsFilterApply');
-  function apply(){
-    if(!table) return;
-    var term = search ? (search.value || '').toLowerCase() : '';
+  var btn    = document.getElementById('clientsFilterApply');
+
+  function apply() {
+    var term = search ? (search.value || '').trim() : '';
+
+    // Prefer DataTables search when available so pagination + ordering stay consistent.
+    if (window.jQuery && $.fn && $.fn.DataTable && table && $.fn.DataTable.isDataTable($(table))) {
+      var dt = $(table).DataTable();
+      dt.search(term).draw();
+      return;
+    }
+
+    // Fallback: manual filter on the currently rendered rows.
+    if (!table) return;
+    var lower = term.toLowerCase();
     table.querySelectorAll('tbody tr').forEach(function(tr){
-      var txt = (tr.innerText || '').toLowerCase();
-      tr.style.display = term ? (txt.indexOf(term) !== -1 ? '' : 'none') : '';
+      var txt = (tr.getAttribute('data-search-text') || tr.innerText || '').toLowerCase();
+      tr.style.display = lower ? (txt.indexOf(lower) !== -1 ? '' : 'none') : '';
     });
   }
-  if (search) search.addEventListener('input', apply);
+
+  if (search) {
+    search.addEventListener('input', apply);
+    search.addEventListener('keydown', function(e){
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        apply();
+      }
+    });
+  }
   if (btn) btn.addEventListener('click', apply);
 
   // Hide DataTables default search/length controls to avoid duplicate search bars
