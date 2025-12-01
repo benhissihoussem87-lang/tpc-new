@@ -412,7 +412,7 @@ document.addEventListener('DOMContentLoaded', function(){
 												}
 											?>
 <?php
-  $searchText = strtolower(trim($key['num_offre'].' '.$key['date'].' '.$key['nom_client']));
+  $searchText = strtolower(trim(($key['num_offre'] ?? '').' '.($key['date'] ?? '').' '.($key['nom_client'] ?? '')));
 ?>
 											 <tr<?php if ($yearValue !== '') { ?> data-year-values="<?= htmlspecialchars($yearValue) ?>"<?php } ?> data-search-text="<?= htmlspecialchars($searchText) ?>">
 												<td><a href="#">
