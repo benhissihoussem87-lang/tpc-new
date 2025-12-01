@@ -147,6 +147,38 @@ if ($selectedYear !== '') {
     });
   }
 })();
+
+// Hook custom search input to DataTables (or fallback)
+document.addEventListener('DOMContentLoaded', function(){
+  var input = document.getElementById('avoirSearch');
+  if (!input) return;
+  var tableSelector = input.getAttribute('data-table-search') || '#dataTable';
+  var $table = window.jQuery ? jQuery(tableSelector) : null;
+
+  function apply() {
+    var term = (input.value || '').trim();
+    if ($table && $table.length && $table.DataTable) {
+      var dt = $table.DataTable();
+      dt.search(term).draw();
+      return;
+    }
+    var table = document.querySelector(tableSelector);
+    if (!table) return;
+    var lower = term.toLowerCase();
+    table.querySelectorAll('tbody tr').forEach(function(tr){
+      var txt = (tr.innerText || '').toLowerCase();
+      tr.style.display = lower ? (txt.indexOf(lower) !== -1 ? '' : 'none') : '';
+    });
+  }
+
+  input.addEventListener('input', apply);
+  input.addEventListener('keydown', function(e){
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      apply();
+    }
+  });
+});
 </script>
 
 
