@@ -14,16 +14,25 @@ if (!isset($_GET['Facture'])) {
 // Ajout Bodereau
  
  if(isset($_REQUEST['btnSubmitAjout'])){
-	 $facture=$_POST['facture'];
+	 $facture = $_POST['facture'];
 	 if(isset($_GET['Facture'])){
-	 $adresse= $_SESSION['adresse'];
+	     $adresse = $_SESSION['adresse'];
+	 } else {
+	     $adresse = $_POST['adresse_bordereaux'];
 	 }
-	 else {$adresse= $_POST['adresse_bordereaux'];}
+
+     // Type + quantité (ex: "3 x Attestation")
+     $typeRaw   = isset($_POST['type']) ? trim((string)$_POST['type']) : '';
+     $quantite  = isset($_POST['quantite']) ? (int)$_POST['quantite'] : 1;
+     if ($quantite < 1) { $quantite = 1; }
+     $typeWithQty = $typeRaw;
+     if ($typeRaw !== '' && $quantite > 1) {
+         $typeWithQty = $quantite.' x '.$typeRaw;
+     }
 	 
-	// echo '<h1> Adresse Bordereaux '.$adresse.'</h1>';
-// Get Num Facture 
-	$numBordereau=$_POST['facture'];
- 	if($bordereau->Ajout(@$_POST['facture'],@$_POST['date'],@$_POST['facture'],@$_FILES['bordereau']['name'],str_replace("'","\'",$_POST['type']),str_replace("'","\'",$adresse)))
+	// Get Num Facture 
+	$numBordereau = $_POST['facture'];
+ 	if($bordereau->Ajout(@$_POST['facture'],@$_POST['date'],@$_POST['facture'],@$_FILES['bordereau']['name'],$typeWithQty,$adresse))
 		 {
 			 if($_FILES['bordereau']['name']!=''){
 	@copy($_FILES['bordereau']['tmp_name'],'pages/Bordereaux/bordereaux_piecesJointe/'.$_FILES['bordereau']['name']);
@@ -108,7 +117,7 @@ else {
 				   
 			</div>
 			
-			 <div class="mb-3 col-3" >
+			 <div class="mb-3 col-2" >
 				<label for="type" class="col-form-label">Type :</label>
 				<input list="types" class="form-control" name="type" id="type" placeholder="Choisir/ecrire le type de bordereau">
 				<datalist id="types">
@@ -120,6 +129,10 @@ else {
 				
 				   
 			</div>
+            <div class="mb-3 col-1">
+                <label for="quantite" class="col-form-label">Qté:</label>
+                <input type="number" min="1" value="1" class="form-control" id="quantite" name="quantite"/>
+            </div>
 			<div class="mb-3 col-3" >
 				<label for="bordereau" class="col-form-label">Joindre bordereau:</label>
 				<input type="file" class="form-control" id="bordereau" name="bordereau"/>

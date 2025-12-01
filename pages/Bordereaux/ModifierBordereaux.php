@@ -4,20 +4,36 @@ include 'class/Bordereaux.class.php';
 include 'class/Factures.class.php';
 $factures=$facture->AfficherAllFactures();
 $detailBordereau=$bordereau->detailBordereauById($_GET['Update']);
+// Extract base type + quantity (stored like "3 x Attestation" or just "Attestation")
+$bordTypeBase = isset($detailBordereau['type']) ? (string)$detailBordereau['type'] : '';
+$bordQuantite = 1;
+if ($bordTypeBase !== '') {
+    if (preg_match('/^(\d+)\s*x\s*(.+)$/i', $bordTypeBase, $m)) {
+        $bordQuantite = (int)$m[1];
+        $bordTypeBase = $m[2];
+    }
+}
 
 // Modifier Bodereau
  
  if(isset($_REQUEST['btnSubmitModifier'])){
-	 $facture=$_POST['facture'];
-	 $adresse= $_POST['adresse_bordereaux'];
-	 $date= $_POST['adresse_bordereaux'];
+	 $facture = $_POST['facture'];
+	 $adresse = $_POST['adresse_bordereaux'];
 	
-	$numBordereau=$_POST['facture'];
+	$numBordereau = $_POST['facture'];
+
+    $typeRaw   = isset($_POST['type']) ? trim((string)$_POST['type']) : '';
+    $quantite  = isset($_POST['quantite']) ? (int)$_POST['quantite'] : 1;
+    if ($quantite < 1) { $quantite = 1; }
+    $typeWithQty = $typeRaw;
+    if ($typeRaw !== '' && $quantite > 1) {
+        $typeWithQty = $quantite.' x '.$typeRaw;
+    }
 	 
 	// echo '<h1> Adresse Bordereaux '.$adresse.'</h1>';
 // Get Num Facture 
 	
- 	if($bordereau->ModifierBordereau(@$_GET['Update'],@$_FILES['bordereau']['name'],@$_POST['date'],str_replace("'","\'",$_POST['type']),str_replace("'","\'",$adresse),@$facture,$numBordereau))
+ 	if($bordereau->ModifierBordereau(@$_GET['Update'],@$_FILES['bordereau']['name'],@$_POST['date'],$typeWithQty,$adresse,@$facture,$numBordereau))
 		 {
 			 if($_FILES['bordereau']['name']!=''){
 	@copy($_FILES['bordereau']['tmp_name'],'pages/Bordereaux/bordereaux_piecesJointe/'.$_FILES['bordereau']['name']);
@@ -79,9 +95,9 @@ else {echo "<script>alert('Erreur !!! ')</script>";}
 				   
 			</div>
 			
-			 <div class="mb-3 col-3" >
+			 <div class="mb-3 col-2" >
 				<label for="type" class="col-form-label">Type :</label>
-				<input list="types" class="form-control" value="<?=@$detailBordereau['type']?>" name="type" id="type" placeholder="Choisir/ecrire le type de bordereau">
+				<input list="types" class="form-control" value="<?=htmlspecialchars($bordTypeBase)?>" name="type" id="type" placeholder="Choisir/ecrire le type de bordereau">
 				<datalist id="types">
 				<option value="ATTESTATION GAZ & ATTESTATION ELECTRIQUE">
 				  <option value="Attestation">
@@ -91,6 +107,10 @@ else {echo "<script>alert('Erreur !!! ')</script>";}
 				
 				   
 			</div>
+            <div class="mb-3 col-1">
+                <label for="quantite" class="col-form-label">Qté:</label>
+                <input type="number" min="1" class="form-control" id="quantite" name="quantite" value="<?= (int)$bordQuantite ?>"/>
+            </div>
 			<div class="mb-3 col-3" >
 				<label for="bordereau" class="col-form-label">Joindre bordereau:</label>
 				<input type="file" class="form-control" id="bordereau" name="bordereau"/>
