@@ -39,7 +39,7 @@ if ($numFact !== '') {
     'num' => '1',
     'des' => '<div><strong>Facture N&deg;:</strong> '.e($numFact).'</div>',
     'nb'  => '1',
-    'obs' => '',
+    'obs' => 'pour reglement',
   ];
 }
 foreach ((array)$infosBordereaux as $row) {
@@ -48,19 +48,29 @@ foreach ((array)$infosBordereaux as $row) {
   if (!empty($row['adresse_bordereaux'])) {
     $des .= '<div style="font-weight:700;text-transform:uppercase">'.e($row['adresse_bordereaux']).'</div>';
   }
-  if (!empty($row['type'])) {
-    $parts = preg_split('/<br>|&/i', (string)$row['type']);
+  // Base type string as stored in DB (may include quantity like "3 x Attestation")
+  $typeRaw = isset($row['type']) ? (string)$row['type'] : '';
+  if ($typeRaw !== '') {
+    $parts = preg_split('/<br>|&/i', $typeRaw);
     foreach ($parts as $p) {
       $p = trim($p);
       if ($p !== '') $des .= '<div>'.e($p).'</div>';
     }
   }
   if ($des === '') { $des = '&nbsp;'; }
+
+  // Default quantity = 1; if type looks like "N x Something", extract N
+  $qty = 1;
+  if ($typeRaw !== '' && preg_match('/^\\s*(\\d+)\\s*x\\s*/i', $typeRaw, $mQty)) {
+    $qty = (int)$mQty[1];
+    if ($qty < 1) { $qty = 1; }
+  }
+
   $rows[] = [
     'num' => (string)$idx,
     'des' => $des,
-    'nb'  => isset($row['nb']) ? (string)$row['nb'] : '1',
-    'obs' => isset($row['obs']) ? (string)$row['obs'] : '',
+    'nb'  => isset($row['nb']) ? (string)$row['nb'] : (string)$qty,
+    'obs' => isset($row['obs']) ? (string)$row['obs'] : 'pour archive',
   ];
 }
 /* Ensure at least 3 rows (editable blanks) */
