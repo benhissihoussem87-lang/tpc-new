@@ -54,7 +54,12 @@ foreach ((array)$infosBordereaux as $row) {
     $parts = preg_split('/<br>|&/i', $typeRaw);
     foreach ($parts as $p) {
       $p = trim($p);
-      if ($p !== '') $des .= '<div>'.e($p).'</div>';
+      if ($p === '') continue;
+      // Strip leading "N x " if present, since quantity is shown in its own column
+      if (preg_match('/^\\s*\\d+\\s*x\\s*(.+)$/i', $p, $mLine)) {
+        $p = $mLine[1];
+      }
+      $des .= '<div>'.e($p).'</div>';
     }
   }
   if ($des === '') { $des = '&nbsp;'; }
